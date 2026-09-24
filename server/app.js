@@ -20,6 +20,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 initializeDatabaseConnections();
 
 // Initialize Cloudinary
+    // Request logging middleware
+    app.use((req, res, next) => {
+      console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+      next();
+    });
 initializeCloudinary();
 
 // API routes
@@ -34,7 +39,10 @@ app.get('/api/v1/health/ping', (req, res) => {
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: 'Route not found',
+    requestedUrl: req.originalUrl,
+    method: req.method,
+    hint: 'Check the API documentation for available routes and ensure you are using the correct URL and HTTP method.'
   });
 });
 
