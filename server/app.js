@@ -1,0 +1,44 @@
+const express = require('express');
+const cors = require('cors');
+const { initializeDatabaseConnections } = require('./config/turso');
+const { initializeCloudinary } = require('./config/cloudflare');
+const apiRouter = require('./api/index');
+const { errorHandler } = require('./middleware/error.middleware');
+const logger = require('./utils/logger');
+
+const app = express();
+
+// Middleware
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Initialize database connections
+initializeDatabaseConnections();
+
+// Initialize Cloudinary
+initializeCloudinary();
+
+// API routes
+app.use('/api/v1', apiRouter);
+
+// Health check endpoint (for Render.com sleep prevention)
+app.get('/api/v1/health/ping', (req, res) => {
+  res.status(200).json({ status: 'alive', timestamp: new Date().toISOString() });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  });
+});
+
+// Error handling middleware (must be last)
+app.use(errorHandler);
+
+module.exports = app;
