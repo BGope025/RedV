@@ -3,15 +3,18 @@ dotenv.config();
 
 // Validate required environment variables
 const requiredEnvVars = [
-  'TURSO_CATALOG_URL',
-  'TURSO_CATALOG_AUTH_TOKEN',
-  'TURSO_ORDERS_URL',
-  'TURSO_ORDERS_AUTH_TOKEN',
   'CLOUDINARY_CLOUD_NAME',
   'CLOUDINARY_API_KEY',
   'CLOUDINARY_API_SECRET',
   'JWT_SECRET'
 ];
+
+if (!process.env.TURSO_CATALOG_URL && !process.env.DATA_PATH) {
+  requiredEnvVars.push('TURSO_CATALOG_URL');
+}
+if (!process.env.TURSO_ORDERS_URL && !process.env.DATA_PATH) {
+  requiredEnvVars.push('TURSO_ORDERS_URL');
+}
 
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 

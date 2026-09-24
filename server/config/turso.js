@@ -1,5 +1,6 @@
 const { createClient } = require('@libsql/client');
 const { catalogDbUrl, catalogDbAuthToken, ordersDbUrl, ordersDbAuthToken } = require('./env');
+const path = require('path');
 
 // Database clients
 let catalogDb = null;
@@ -10,16 +11,20 @@ let ordersDb = null;
  */
 const initializeDatabaseConnections = () => {
   try {
+    const dataPath = process.env.DATA_PATH || process.cwd();
+    
     // Catalog database connection
+    const finalCatalogUrl = catalogDbUrl || `file:${path.join(dataPath, 'catalog.db')}`;
     catalogDb = createClient({
-      url: catalogDbUrl,
-      authToken: catalogDbAuthToken
+      url: finalCatalogUrl,
+      ...(catalogDbAuthToken && { authToken: catalogDbAuthToken })
     });
 
     // Orders database connection
+    const finalOrdersUrl = ordersDbUrl || `file:${path.join(dataPath, 'orders.db')}`;
     ordersDb = createClient({
-      url: ordersDbUrl,
-      authToken: ordersDbAuthToken
+      url: finalOrdersUrl,
+      ...(ordersDbAuthToken && { authToken: ordersDbAuthToken })
     });
 
     console.log('Database connections initialized successfully');
