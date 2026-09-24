@@ -3,7 +3,6 @@ const cors = require('cors');
 const { initializeDatabaseConnections } = require('./config/turso');
 const { initializeCloudinary } = require('./config/cloudflare');
 const apiRouter = require('./api/index');
-const frontendRouter = require('./routes/frontendRoutes');
 const { errorHandler } = require('./middleware/error.middleware');
 const logger = require('./utils/logger');
 
@@ -27,7 +26,6 @@ initializeDatabaseConnections();
       next();
     });
 initializeCloudinary();
-app.use("/", frontendRouter);
 
 // API routes
 app.use('/api/v1', apiRouter);
