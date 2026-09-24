@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+router.get('/', (req, res) => { res.status(200).json({ status: 'ok', message: 'Backend is running' }); });
 const { login, logout } = require('../api/v1/auth/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 
