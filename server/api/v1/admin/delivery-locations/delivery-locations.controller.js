@@ -1,7 +1,7 @@
-const { getDatabaseConnection } = require('../../../config/turso');
-const { generateNotFoundError, generateValidationError } = require('../../../utils/error-classes');
-const logger = require('../../../utils/logger');
-const { protect } = require('../../../middleware/auth.middleware');
+const { getDatabaseConnection } = require('../../../../config/turso');
+const { generateNotFoundError, generateValidationError } = require('../../../../utils/error-classes');
+const logger = require('../../../../utils/logger');
+const { protect } = require('../../../../middleware/auth.middleware');
 
 /**
  * Get all delivery locations (including unavailable) for admin
