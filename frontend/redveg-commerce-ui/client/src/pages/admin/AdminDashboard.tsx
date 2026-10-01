@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight, CalendarClock, ChevronRight, PackagePlus, Plus, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
-import { apiUrl } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 export default function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([]);
-  const [orders, setOrders] = useState([]);
-  const [stats, setStats] = useState([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [stats, setStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,21 +18,21 @@ export default function AdminDashboard() {
         setLoading(true);
 
         // Fetch products
-        const productsResponse = await fetch(apiUrl('products'));
+        const productsResponse = await apiFetch('products');
         if (!productsResponse.ok) throw new Error(`Failed to fetch products: ${productsResponse.status}`);
         let productsData = await productsResponse.json();
         productsData = productsData.data || productsData;
         setProducts(Array.isArray(productsData) ? productsData : []);
 
         // Fetch orders (limit to recent ones if backend supports it, otherwise fetch all and slice)
-        const ordersResponse = await fetch(apiUrl('orders'));
+        const ordersResponse = await apiFetch('orders');
         if (!ordersResponse.ok) throw new Error(`Failed to fetch orders: ${ordersResponse.status}`);
         let ordersData = await ordersResponse.json();
         ordersData = ordersData.data || ordersData;
         setOrders(Array.isArray(ordersData) ? ordersData : []);
 
         // Fetch stats
-        const statsResponse = await fetch(apiUrl('stats'));
+        const statsResponse = await apiFetch('stats');
         if (!statsResponse.ok) throw new Error(`Failed to fetch stats: ${statsResponse.status}`);
         let statsData = await statsResponse.json();
         statsData = statsData.data || statsData;
@@ -61,9 +61,9 @@ export default function AdminDashboard() {
   // Calculate low stock variants (stock <= 9)
   const lowStock = products
     .flatMap((product) =>
-      product.variants
-        .filter((variant) => variant.stock <= 9)
-        .map((variant) => ({ product, variant }))
+      (product.variants ?? [])
+        .filter((variant: any) => variant.stock <= 9)
+        .map((variant: any) => ({ product, variant }))
     )
     .slice(0, 4);
 

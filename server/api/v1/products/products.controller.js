@@ -45,10 +45,18 @@ function mapProduct(row, variants = []) {
 const getAllProducts = async (req, res) => {
   try {
     const db = await getDatabaseConnection('catalog');
+    const category = typeof req.query.category === 'string' ? req.query.category.trim().toLowerCase() : '';
+    const categoryFilter = category && category !== 'all'
+      ? " AND LOWER(REPLACE(REPLACE(REPLACE(p.category, ' & ', '-'), ' ', '-'), '_', '-')) = ?"
+      : '';
 
     const result = await db.execute({
-      sql: "SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count FROM products p LEFT JOIN variants v ON p.id = v.product_id WHERE p.is_active = 1 ORDER BY p.created_at DESC",
-      args: []
+      sql: `SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count
+            FROM products p
+            LEFT JOIN variants v ON p.id = v.product_id
+            WHERE p.is_active = 1${categoryFilter}
+            ORDER BY p.created_at DESC`,
+      args: categoryFilter ? [category] : []
     });
 
     const productsMap = new Map();

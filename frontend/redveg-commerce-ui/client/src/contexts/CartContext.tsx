@@ -23,7 +23,7 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "redveg-cart-v1";
 
-import { apiUrl } from "@/lib/api";
+import { apiFetch, unwrapApiData } from "@/lib/api";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() => {
@@ -42,13 +42,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await fetch(apiUrl('products'));
+        const response = await apiFetch('products');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        let data = await response.json();
-        data = data.data || data;
-        setProducts(data);
+        const payload = await response.json();
+        setProducts(unwrapApiData<Product[]>(payload, []));
       } catch (error) {
         console.error("Error fetching products for cart:", error);
       } finally {

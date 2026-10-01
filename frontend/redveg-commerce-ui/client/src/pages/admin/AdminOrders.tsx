@@ -6,7 +6,7 @@ import type { Order, OrderStatus } from "@/types/commerce";
 import { ChevronDown, Download, Filter, MapPin, MessageCircle, Phone, Search, X } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
-import { apiUrl } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 const statuses: OrderStatus[] = ["New", "Confirmed", "Processing", "Out for Delivery", "Delivered", "Cancelled"];
 
@@ -21,7 +21,7 @@ export default function AdminOrders() {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const response = await fetch(apiUrl('orders'));
+        const response = await apiFetch('orders');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

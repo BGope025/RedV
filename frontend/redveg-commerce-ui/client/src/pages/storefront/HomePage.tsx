@@ -1,13 +1,12 @@
-import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/storefront/ProductCard";
 import { StoreShell } from "@/components/storefront/StoreShell";
-import { assets } from "@/lib/assets";
-import { ArrowRight, ArrowLeft, BadgeCheck, Clock3, MapPin, ShieldCheck, Sparkles, ThermometerSnowflake, ChevronDown } from "lucide-react";
+import { ArrowRight, Clock3, ShieldCheck, ThermometerSnowflake } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import HeroSlideshow from "@/components/HeroSlideshow";
 import { useCampaign } from "@/contexts/CampaignContext";
-import { apiUrl } from "@/lib/api";
+import { apiFetch, normalizeCategorySlug, unwrapApiData } from "@/lib/api";
+import type { Category, Product } from "@/types/commerce";
 
 const promises = [
   { icon: ThermometerSnowflake, title: "Freshness locked", text: "Temperature-controlled handling from source to doorstep." },
@@ -16,178 +15,79 @@ const promises = [
 ];
 
 export default function HomePage() {
-  const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { activeCampaign } = useCampaign();
 
   useEffect(() => {
+    let cancelled = false;
     const fetchHomeData = async () => {
       try {
         setLoading(true);
-
-        // Fetch categories
-        const categoriesResponse = await fetch(apiUrl('categories'));
+        setError(null);
+        const [categoriesResponse, productsResponse] = await Promise.all([
+          apiFetch("categories"),
+          apiFetch("products"),
+        ]);
         if (!categoriesResponse.ok) throw new Error(`Failed to fetch categories: ${categoriesResponse.status}`);
-        const categoriesData = await categoriesResponse.json();
-        setCategories(categoriesData);
-
-        // Fetch products
-        const productsResponse = await fetch(apiUrl('products'));
         if (!productsResponse.ok) throw new Error(`Failed to fetch products: ${productsResponse.status}`);
-        let productsData = await productsResponse.json();
-        productsData = productsData.data || productsData;
-        setProducts(productsData);
-      } catch (error) {
-        console.error("Error fetching home page data:", error);
+        const categoriesPayload = await categoriesResponse.json();
+        const productsPayload = await productsResponse.json();
+        if (!cancelled) {
+          setCategories(unwrapApiData<Category[]>(categoriesPayload, []));
+          setProducts(unwrapApiData<Product[]>(productsPayload, []));
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load storefront");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
-
     fetchHomeData();
+    return () => { cancelled = true; };
   }, []);
 
   if (loading) {
-    return (
-      <StoreShell>
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
-        </div>
-      </StoreShell>
-    );
+    return <StoreShell><div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" /></div></StoreShell>;
   }
-
-  // Shared category configuration for landing page
-  const landingCategories = [
-    { label: "Chicken", slug: "chicken" },
-    { label: "Mutton", slug: "mutton" },
-    { label: "Fish", slug: "fish" },
-    { label: "Prawns", slug: "prawns" },
-    { label: "Crabs & Seafood", slug: "crabs-seafood" },
-    { label: "Combos", slug: "combos" },
-    { label: "Offers", slug: "offers" },
-  ];
 
   return (
     <StoreShell>
-      <section className="container pt-5 sm:pt-7">
-        <HeroSlideshow />
-      </section>
+      <section className="container pt-5 sm:pt-7"><HeroSlideshow /></section>
 
-      {/* Seasonal Collection Module */}
-      {activeCampaign && (activeCampaign.placement === 'collection_module' || activeCampaign.placement === 'both') && (
+      {activeCampaign && (activeCampaign.placement === "collection_module" || activeCampaign.placement === "both") && (
         <section className="container pt-6 sm:pt-10">
-          <div 
-            className="group relative overflow-hidden rounded-[2rem] p-8 sm:p-12"
-            style={{ backgroundColor: activeCampaign.backgroundColor }}
-          >
-            {/* Background Pattern / Image */}
+          <div className="group relative overflow-hidden rounded-[2rem] p-8 sm:p-12" style={{ backgroundColor: activeCampaign.backgroundColor }}>
             {(activeCampaign.backgroundPattern || activeCampaign.collectionImageUrl || activeCampaign.desktopImageUrl) && (
-              <div 
-                className="absolute inset-0 opacity-20 transition-transform duration-700 group-hover:scale-105"
-                style={{
-                  backgroundImage: `url(${activeCampaign.backgroundPattern || activeCampaign.collectionImageUrl || activeCampaign.desktopImageUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              />
+              <div className="absolute inset-0 opacity-20 transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${activeCampaign.backgroundPattern || activeCampaign.collectionImageUrl || activeCampaign.desktopImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
             )}
-            
-            <div className="relative z-10 flex flex-col items-start gap-4 max-w-2xl">
-              {activeCampaign.logoVariant && (
-                <img src={activeCampaign.logoVariant} alt="" className="h-12 w-auto object-contain mb-2" />
-              )}
-              
-              <h2 
-                className="font-display text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl"
-                style={{ color: activeCampaign.foregroundColor }}
-              >
-                {activeCampaign.collectionTitle || activeCampaign.name}
-              </h2>
-              
-              <p 
-                className="text-lg font-medium sm:text-xl opacity-90"
-                style={{ color: activeCampaign.foregroundColor }}
-              >
-                {activeCampaign.collectionSubtitle || activeCampaign.message}
-              </p>
-              
-              {activeCampaign.ctaLabel && (
-                <Link
-                  href={activeCampaign.collectionLink || activeCampaign.destinationValue || "/shop"}
-                  className="mt-4 inline-flex items-center gap-2 rounded-full px-6 py-3 font-bold shadow-sm transition-transform hover:-translate-y-0.5 active:scale-95"
-                  style={{ 
-                    backgroundColor: activeCampaign.buttonColor, 
-                    color: activeCampaign.buttonTextColor 
-                  }}
-                >
-                  {activeCampaign.ctaLabel}
-                  <ArrowRight className="size-4" />
-                </Link>
-              )}
+            <div className="relative z-10 flex max-w-2xl flex-col items-start gap-4">
+              {activeCampaign.logoVariant && <img src={activeCampaign.logoVariant} alt="" className="mb-2 h-12 w-auto object-contain" />}
+              <h2 className="font-display text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl" style={{ color: activeCampaign.foregroundColor }}>{activeCampaign.collectionTitle || activeCampaign.name}</h2>
+              <p className="text-lg font-medium opacity-90 sm:text-xl" style={{ color: activeCampaign.foregroundColor }}>{activeCampaign.collectionSubtitle || activeCampaign.message}</p>
+              {activeCampaign.ctaLabel && <Link href={activeCampaign.collectionLink || activeCampaign.destinationValue || "/shop"} className="mt-4 inline-flex items-center gap-2 rounded-full px-6 py-3 font-bold shadow-sm transition-transform hover:-translate-y-0.5 active:scale-95" style={{ backgroundColor: activeCampaign.buttonColor, color: activeCampaign.buttonTextColor }}>{activeCampaign.ctaLabel}<ArrowRight className="size-4" /></Link>}
             </div>
-            
-            {/* Decorative accent */}
-            {activeCampaign.accentColor && (
-              <div 
-                className="absolute -right-24 -top-24 size-64 rounded-full blur-3xl opacity-30"
-                style={{ backgroundColor: activeCampaign.accentColor }}
-              />
-            )}
+            {activeCampaign.accentColor && <div className="absolute -right-24 -top-24 size-64 rounded-full blur-3xl opacity-30" style={{ backgroundColor: activeCampaign.accentColor }} />}
           </div>
         </section>
       )}
-      
-      {/* Keep the existing sections below the hero */}
-      <section className="container pt-5 sm:pt-7">
-        <div className="space-y-8">
-          <div className="border-b border-black/5 bg-[#F6F1EC]">
-            <div className="container py-10 sm:py-14">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#B4232C]">Fresh catalogue</p>
-              <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h1 className="font-display text-4xl font-black tracking-[-0.045em] sm:text-5xl">Shop all fresh cuts</h1>
-                  <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                    Chicken, mutton, fish, prawns and non-vegetarian combos—nothing else.
-                  </p>
-                </div>
-                <Link href="/" className="text-sm font-bold text-[#B4232C]">
-                  Home / <span className="text-muted-foreground">Shop</span>
-                </Link>
-              </div>
-            </div>
-          </div>
 
-          {/* Rest of the original HomePage content would go here - but since it was cut off in my read,
-          I'll need to preserve what was there. Let me check what came after the HeroSlideshow... */}
-
-          {/* Actually, looking at the original file, there was nothing after the HeroSlideshow
-          section except the closing StoreShell tag, so this should be fine */}
+      <section className="container pt-8 sm:pt-12" aria-labelledby="shop-by-category">
+        <div className="flex items-end justify-between gap-4">
+          <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#B4232C]">Browse fresh cuts</p><h2 id="shop-by-category" className="mt-2 font-display text-3xl font-black tracking-[-0.04em] sm:text-4xl">Shop by category</h2><p className="mt-2 text-sm text-muted-foreground">Choose a category to see matching products from our live catalogue.</p></div>
+          <Link href="/shop" className="hidden items-center gap-1 text-sm font-black text-[#B4232C] sm:inline-flex">View all <ArrowRight className="size-4" /></Link>
         </div>
+        {error ? <div className="mt-6 rounded-2xl border border-dashed border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</div> : categories.length === 0 ? <div className="mt-6 rounded-2xl border border-dashed border-black/10 bg-white p-8 text-center text-sm text-muted-foreground">No live categories are available yet.</div> : <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">{categories.map((category) => { const slug = normalizeCategorySlug(category.id || category.name); const matchingProduct = products.find((product) => normalizeCategorySlug(product.category) === slug); const image = category.image && !category.image.includes("placeholder-") ? category.image : matchingProduct?.image; return <Link key={category.id} href={`/shop?category=${encodeURIComponent(slug)}`} aria-label={`Shop ${category.name}`} className="group overflow-hidden rounded-[1.35rem] bg-white shadow-[0_10px_30px_rgba(61,33,27,.06)] ring-1 ring-black/[0.05] transition hover:-translate-y-1 hover:shadow-[0_16px_35px_rgba(61,33,27,.12)]"><div className="aspect-square overflow-hidden bg-[#F6F1EC]">{image ? <img src={image} alt={category.name} className="size-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid size-full place-items-center text-center text-sm font-black text-[#B4232C]" style={{ backgroundColor: category.accent }}>{category.name}</div>}</div><div className="p-3"><p className="text-sm font-black">{category.name}</p><p className="mt-1 text-xs text-muted-foreground">{category.description || "Fresh products"}</p></div></Link>; })}</div>}
       </section>
+
+      <section className="container py-10 sm:py-14" aria-labelledby="featured-products">
+        <div className="flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#B4232C]">Live catalogue</p><h2 id="featured-products" className="mt-2 font-display text-3xl font-black tracking-[-0.04em] sm:text-4xl">Fresh cuts for today</h2></div><Link href="/shop" className="inline-flex items-center gap-1 text-sm font-black text-[#B4232C]">See all <ArrowRight className="size-4" /></Link></div>
+        {products.length > 0 ? <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">{products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="mt-6 rounded-2xl border border-dashed border-black/10 bg-white p-8 text-center text-sm text-muted-foreground">No active products are available yet.</div>}
+      </section>
+
+      <section className="container grid gap-3 pb-12 sm:grid-cols-3">{promises.map(({ icon: Icon, title, text }) => <div key={title} className="rounded-2xl bg-white p-5 ring-1 ring-black/[0.05]"><Icon className="size-5 text-[#B4232C]" /><h3 className="mt-3 font-black">{title}</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p></div>)}</section>
     </StoreShell>
   );
-}
-
-// Helper function to get category-specific colors
-function getCategoryColor(slug: string): string {
-  switch (slug) {
-    case 'chicken':
-      return '#D62F37'; // Red/coral
-    case 'mutton':
-      return '#B4232C'; // Warm gold
-    case 'fish':
-      return '#0EA5E9'; // Blue
-    case 'prawns':
-      return '#10B981'; // Emerald
-    case 'crabs-seafood':
-      return '#F59E0B'; // Amber
-    case 'combos':
-      return '#8B5CF6'; // Violet
-    case 'offers':
-      return '#EF4444'; // Red
-    default:
-      return '#6B7280'; // Gray
-  }
 }
