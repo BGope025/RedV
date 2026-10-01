@@ -34,5 +34,13 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@firebase/util",
+      "esbuild",
+      "protobufjs",
+      "sharp"
+    ]
   }
 }

@@ -18,6 +18,9 @@ if (!process.env.TURSO_ORDERS_URL && !process.env.DATA_PATH) {
 if (!process.env.TURSO_CUSTOMER_URL && !process.env.DATA_PATH) {
   requiredEnvVars.push('TURSO_CUSTOMER_URL');
 }
+if (!process.env.AVAILABLE_PINCODES_DB_URL && !process.env.DATA_PATH) {
+  requiredEnvVars.push('AVAILABLE_PINCODES_DB_URL');
+}
 
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
@@ -41,6 +44,10 @@ module.exports = {
   // Turso Customers DB
   customerDbUrl: process.env.TURSO_CUSTOMER_URL,
   customerDbAuthToken: process.env.TURSO_CUSTOMER_AUTH_TOKEN,
+
+  // Turso Available Pincodes DB
+  availablePincodesDbUrl: process.env.AVAILABLE_PINCODES_DB_URL,
+  availablePincodesDbAuthToken: process.env.AVAILABLE_PINCODES_DB_AUTH_TOKEN,
 
   // Cloudinary
   cloudinary: {

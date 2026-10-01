@@ -1,11 +1,21 @@
 const { createClient } = require('@libsql/client');
-const { catalogDbUrl, catalogDbAuthToken, ordersDbUrl, ordersDbAuthToken, customerDbUrl, customerDbAuthToken } = require('./env');
+const {
+  catalogDbUrl,
+  catalogDbAuthToken,
+  ordersDbUrl,
+  ordersDbAuthToken,
+  customerDbUrl,
+  customerDbAuthToken,
+  availablePincodesDbUrl,
+  availablePincodesDbAuthToken
+} = require('./env');
 const path = require('path');
 
 // Database clients
 let catalogDb = null;
 let ordersDb = null;
 let customerDb = null;
+let availablePincodesDb = null;
 
 /**
  * Initialize database connections
@@ -33,6 +43,13 @@ const initializeDatabaseConnections = () => {
     customerDb = createClient({
       url: finalCustomerUrl,
       ...(customerDbAuthToken && { authToken: customerDbAuthToken })
+    });
+
+    // Available Pincodes database connection
+    const finalAvailablePincodesUrl = availablePincodesDbUrl || `file:${path.join(dataPath, 'available-pincodes.db')}`;
+    availablePincodesDb = createClient({
+      url: finalAvailablePincodesUrl,
+      ...(availablePincodesDbAuthToken && { authToken: availablePincodesDbAuthToken })
     });
 
     // Initialize database schema
@@ -134,6 +151,34 @@ const initializeSchema = async () => {
       `);
     }
 
+    // Create available_pincodes table if not exists
+    if (availablePincodesDb) {
+      await availablePincodesDb.execute(`
+        CREATE TABLE IF NOT EXISTS available_pincodes (
+          pincode TEXT PRIMARY KEY,
+          area TEXT NOT NULL,
+          city TEXT NOT NULL,
+          state TEXT NOT NULL,
+          is_serviceable INTEGER NOT NULL DEFAULT 1 CHECK (is_serviceable IN (0, 1)),
+          latitude REAL,
+          longitude REAL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Create indexes for better query performance
+      await availablePincodesDb.execute(`
+        CREATE INDEX IF NOT EXISTS idx_available_pincodes_is_serviceable ON available_pincodes(is_serviceable);
+      `);
+      await availablePincodesDb.execute(`
+        CREATE INDEX IF NOT EXISTS idx_available_pincodes_city ON available_pincodes(city);
+      `);
+      await availablePincodesDb.execute(`
+        CREATE INDEX IF NOT EXISTS idx_available_pincodes_state ON available_pincodes(state);
+      `);
+    }
+
     // Migrate orders table: add customer_id and order_date if they don't exist
     if (ordersDb) {
       // Check if customer_id column exists
@@ -164,7 +209,7 @@ const initializeSchema = async () => {
 
 /**
  * Get database connection by name
- * @param {string} dbName - Either 'catalog', 'orders', or 'customer'
+ * @param {string} dbName - Either 'catalog', 'orders', 'customer', or 'availablePincodes'
  * @returns {object} Database client
  */
 const getDatabaseConnection = async (dbName) => {
@@ -184,6 +229,11 @@ const getDatabaseConnection = async (dbName) => {
         throw new Error('Customer database not initialized');
       }
       return customerDb;
+    case 'availablePincodes':
+      if (!availablePincodesDb) {
+        throw new Error('Available Pincodes database not initialized');
+      }
+      return availablePincodesDb;
     default:
       throw new Error(`Invalid database name: ${dbName}`);
   }

@@ -23,8 +23,10 @@ const AdminOrders = lazy(() => import("@/pages/admin/AdminOrders"));
 const AdminCatalog = lazy(() => import("@/pages/admin/AdminCatalog"));
 const AdminOffers = lazy(() => import("@/pages/admin/AdminOffers"));
 const AdminModule = lazy(() => import("@/pages/admin/AdminModule"));
+const AdminAnalytics = lazy(() => import("@/pages/admin/AdminAnalytics"));
 const AdminHeaderTheme = lazy(() => import("@/pages/admin/AdminHeaderTheme"));
 const AdminCampaignForm = lazy(() => import("@/pages/admin/AdminCampaignForm"));
+const AdminDeliveryAreas = lazy(() => import("@/pages/admin/AdminDeliveryAreas"));
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -81,7 +83,7 @@ function Router() {
           )} />
           <Route path="/admin/delivery" component={() => (
             <ProtectedRoute adminOnly>
-              <AdminModule />
+              <AdminDeliveryAreas />
             </ProtectedRoute>
           )} />
           <Route path="/admin/customers" component={() => (
@@ -91,7 +93,7 @@ function Router() {
           )} />
           <Route path="/admin/analytics" component={() => (
             <ProtectedRoute adminOnly>
-              <AdminModule />
+              <AdminAnalytics />
             </ProtectedRoute>
           )} />
           <Route path="/admin/settings" component={() => (

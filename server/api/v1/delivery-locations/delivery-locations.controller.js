@@ -10,7 +10,7 @@ const getLocations = async (req, res) => {
   try {
     const { serviceableOnly, limit, offset } = req.query;
 
-    let sql = 'SELECT * FROM delivery_locations';
+    let sql = 'SELECT * FROM available_pincodes';
     const args = [];
     const conditions = [];
 
@@ -37,7 +37,7 @@ const getLocations = async (req, res) => {
       args.push(parseInt(offset));
     }
 
-    const db = await getDatabaseConnection('catalog');
+    const db = await getDatabaseConnection('availablePincodes');
     const result = await db.execute({ sql, args });
 
     // Format for frontend compatibility
@@ -46,7 +46,7 @@ const getLocations = async (req, res) => {
       area: location.area || '',
       city: location.city || '',
       state: location.state || '',
-      isServiceable: location.is_servicealbe === 1
+      isServiceable: location.is_serviceable === 1
     }));
 
     res.status(200).json({
@@ -83,9 +83,9 @@ const getLocationByPincode = async (req, res) => {
       throw generateValidationError('Invalid pincode format');
     }
 
-    const db = await getDatabaseConnection('catalog');
+    const db = await getDatabaseConnection('availablePincodes');
     const result = await db.execute({
-      sql: 'SELECT * FROM delivery_locations WHERE pincode = ?',
+      sql: 'SELECT * FROM available_pincodes WHERE pincode = ?',
       args: [pincode]
     });
 
@@ -102,7 +102,7 @@ const getLocationByPincode = async (req, res) => {
         area: location.area || '',
         city: location.city || '',
         state: location.state || '',
-        isServiceable: location.is_servicealbe === 1
+        isServiceable: location.is_serviceable === 1
       }
     });
   } catch (error) {
@@ -141,7 +141,7 @@ const searchLocations = async (req, res) => {
     }
 
     let sql = `
-      SELECT * FROM delivery_locations
+      SELECT * FROM available_pincodes
       WHERE area LIKE ?
          OR city LIKE ?
          OR state LIKE ?
@@ -159,7 +159,7 @@ const searchLocations = async (req, res) => {
       args.push(parseInt(offset));
     }
 
-    const db = await getDatabaseConnection('catalog');
+    const db = await getDatabaseConnection('availablePincodes');
     const result = await db.execute({ sql, args });
 
     // Format for frontend compatibility
@@ -168,7 +168,7 @@ const searchLocations = async (req, res) => {
       area: location.area || '',
       city: location.city || '',
       state: location.state || '',
-      isServiceable: location.is_servicealbe === 1
+      isServiceable: location.is_serviceable === 1
     }));
 
     res.status(200).json({
@@ -192,9 +192,105 @@ const searchLocations = async (req, res) => {
   }
 };
 
+/**
+ * Reverse geocode latitude/longitude to get location details
+ * @route POST /api/v1/delivery-locations/reverse-geocode
+ */
+const reverseGeocode = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+
+    // Validate input
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      throw generateValidationError('Latitude and longitude must be numbers');
+    }
+
+    // For demonstration, we return a fixed location if coordinates are near Kolkata
+    // In a real implementation, you would call a geocoding service (e.g., Google Maps)
+    // and then validate the resulting pincode against the database.
+    const KOLKATA_LAT_MIN = 22.4;
+    const KOLKATA_LAT_MAX = 22.8;
+    const KOLKATA_LNG_MIN = 88.2;
+    const KOLKATA_LNG_MAX = 88.6;
+
+    if (latitude >= KOLKATA_LAT_MIN && latitude <= KOLKATA_LAT_MAX &&
+        longitude >= KOLKATA_LNG_MIN && longitude <= KOLKATA_LNG_MAX) {
+      // Return a known serviceable location in Kolkata
+      const db = await getDatabaseConnection('availablePincodes');
+      const result = await db.execute({
+        sql: 'SELECT * FROM available_pincodes WHERE pincode = ? AND is_serviceable = 1 LIMIT 1',
+        args: ['700065'] // Dumdum
+      });
+
+      if (result.rows.length === 0) {
+        // Fallback to first serviceable location
+        const fallbackResult = await db.execute({
+          sql: 'SELECT * FROM available_pincodes WHERE is_serviceable = 1 LIMIT 1',
+          args: []
+        });
+        if (fallbackResult.rows.length === 0) {
+          throw generateNotFoundError('No serviceable locations found');
+        }
+        const location = fallbackResult.rows[0];
+        res.status(200).json({
+          success: true,
+          data: {
+            pincode: location.pincode,
+            area: location.area || '',
+            city: location.city || '',
+            state: location.state || '',
+            isServiceable: location.is_serviceable === 1,
+            latitude: location.latitude,
+            longitude: location.longitude
+          }
+        });
+      } else {
+        const location = result.rows[0];
+        res.status(200).json({
+          success: true,
+          data: {
+            pincode: location.pincode,
+            area: location.area || '',
+            city: location.city || '',
+            state: location.state || '',
+            isServiceable: location.is_serviceable === 1,
+            latitude: location.latitude,
+            longitude: location.longitude
+          }
+        });
+      }
+    } else {
+      // Coordinates outside Kolkata area - return error or default?
+      // For simplicity, we return an error.
+      throw generateValidationError('Coordinates outside service area');
+    }
+  } catch (error) {
+    if (error.type === 'validation-error') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    if (error.type === 'not-found') {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    logger.error('Error reverse geocoding location:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   getLocations,
   getLocationByPincode,
-  searchLocations
+  searchLocations,
+  reverseGeocode
 };
 
