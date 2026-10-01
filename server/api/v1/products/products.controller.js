@@ -45,11 +45,52 @@ function mapProduct(row, variants = []) {
 const getAllProducts = async (req, res) => {
   try {
     const db = await getDatabaseConnection('catalog');
+    const category = typeof req.query.category === 'string' ? req.query.category.trim().toLowerCase() : '';
+    const search = req.query.q ? req.query.q.trim() : '';
+    const sort = req.query.sort || 'popular';
+    const limit = parseInt(req.query.limit, 10) || null;
+    const offset = parseInt(req.query.offset, 10) || 0;
 
-    const result = await db.execute({
-      sql: "SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count FROM products p LEFT JOIN variants v ON p.id = v.product_id WHERE p.is_active = 1 ORDER BY p.created_at DESC",
-      args: []
-    });
+    let categoryFilter = '';
+    const args = [];
+    if (category && category !== 'all') {
+      categoryFilter += " AND p.category LIKE ?";
+      args.push(category.replace(/-/g, '%'));
+    }
+
+    if (search) {
+      categoryFilter += " AND (p.name LIKE ? OR p.description LIKE ?)";
+      args.push(`%${search}%`, `%${search}%`);
+    }
+
+    let sortClause = 'p.created_at DESC';
+    if (sort === 'price-low') {
+      sortClause = '(SELECT MIN(price) FROM variants WHERE product_id = p.id) ASC';
+    } else if (sort === 'price-high') {
+      sortClause = '(SELECT MIN(price) FROM variants WHERE product_id = p.id) DESC';
+    } else if (sort === 'rating') {
+      sortClause = 'p.rating DESC, p.created_at DESC';
+    }
+
+    let sql = `
+      SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count
+      FROM (
+        SELECT p.*
+        FROM products p
+        WHERE p.is_active = 1 ${categoryFilter}
+        ORDER BY ${sortClause}
+        ${limit ? 'LIMIT ? OFFSET ?' : ''}
+      ) p
+      LEFT JOIN variants v ON p.id = v.product_id
+      ORDER BY ${sortClause}
+    `;
+
+    if (limit) {
+      args.push(limit, offset);
+    }
+
+    // Fetch the raw rows
+    const result = await db.execute({ sql, args });
 
     const productsMap = new Map();
     const variantsMap = new Map();
@@ -73,7 +114,7 @@ const getAllProducts = async (req, res) => {
       }
     });
 
-    const products = Array.from(productsMap.values()).map(row => 
+    let products = Array.from(productsMap.values()).map(row => 
       mapProduct(row, variantsMap.get(row.id))
     );
 

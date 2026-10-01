@@ -5,13 +5,14 @@ import { useCart } from "@/contexts/CartContext";
 import { BadgeCheck, ChevronLeft, Clock3, MapPin, Minus, Plus, ShieldCheck, Star, ThermometerSnowflake } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { apiUrl } from "@/lib/api";
+import { apiFetch, unwrapApiData } from "@/lib/api";
 import { Link, useRoute } from "wouter";
+import type { Product } from "@/types/commerce";
 
 export default function ProductPage() {
   const [, params] = useRoute("/product/:slug");
-  const [product, setProduct] = useState(null);
-  const [related, setRelated] = useState([]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [related, setRelated] = useState<Product[]>([]);
   const [variantId, setVariantId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -24,7 +25,7 @@ export default function ProductPage() {
         setError(null);
 
         // Fetch all products (could be optimized to fetch just one, but we need related products too)
-        const response = await fetch(apiUrl('products'));
+        const response = await apiFetch('products');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -34,8 +35,8 @@ export default function ProductPage() {
           throw new Error("API returned non-JSON response");
         }
         
-        let productsData = await response.json();
-        productsData = productsData.data || productsData; // Handle new JSON format { success, count, data }
+        const productsPayload = await response.json();
+        const productsData = unwrapApiData<Product[]>(productsPayload, []);
 
         if (!Array.isArray(productsData)) {
           throw new Error("Invalid products data format");

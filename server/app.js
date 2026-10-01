@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const { initializeDatabaseConnections } = require('./config/turso');
 const { initializeCloudinary } = require('./config/cloudflare');
 const apiRouter = require('./api/index');
@@ -10,6 +11,7 @@ const logger = require('./utils/logger');
 const app = express();
 
 // Middleware
+app.use(cookieParser());
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   credentials: true

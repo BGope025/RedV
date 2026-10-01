@@ -41,7 +41,8 @@ export const deliveryLocationApi = {
         state: loc.state,
         isServiceable: loc.isServiceable,
         latitude: loc.latitude,
-        longitude: loc.longitude
+        longitude: loc.longitude,
+        deliveryCharge: loc.deliveryCharge
       })) ?? [];
     } catch (error) {
       console.error('Error searching delivery locations:', error);
@@ -79,7 +80,8 @@ export const deliveryLocationApi = {
         state: data.data.state,
         isServiceable: data.data.isServiceable,
         latitude: data.data.latitude,
-        longitude: data.data.longitude
+        longitude: data.data.longitude,
+        deliveryCharge: data.data.deliveryCharge
       } as DeliveryLocation;
     } catch (error) {
       console.error('Error reverse geocoding location:', error);

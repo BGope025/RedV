@@ -120,7 +120,7 @@ export function DeliveryLocationModal({
       } else if (err.code === 3) {
         setGeolocationError('Geolocation request timed out. Please try again or search by pincode.');
       } else {
-        setGeolocationError('An unknown error occurred with geolocation.');
+        setGeolocationError(err.message || 'An unknown error occurred with geolocation.');
       }
     } finally {
       setGeolocationLoading(false);
@@ -154,7 +154,7 @@ export function DeliveryLocationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-md mx-auto">
+      <DialogContent className="sm:max-w-md mx-auto overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             <div className="flex items-center gap-3">
@@ -210,14 +210,14 @@ export function DeliveryLocationModal({
                 <MapPin className="size-5 text-[#B4232C]" />
               )}
             </div>
-            <div className="flex-1 space-y-1">
-              <span className="block text-[0.68rem] font-bold text-foreground">
+            <div className="flex-1 space-y-1 min-w-0">
+              <span className="block text-[0.68rem] font-bold text-foreground truncate">
                 Use my current location
               </span>
               {geolocationError ? (
-                <p className="text-[0.62rem] text-destructive">{geolocationError}</p>
+                <p className="text-[0.62rem] text-destructive break-words whitespace-normal leading-tight">{geolocationError}</p>
               ) : (
-                <p className="text-[0.62rem] text-muted-foreground">
+                <p className="text-[0.62rem] text-muted-foreground break-words whitespace-normal leading-tight">
                   We use your location only to check delivery availability near you.
                 </p>
               )}

@@ -1,43 +1,24 @@
 import type { Campaign, CampaignStatus, CampaignOccasion, CampaignPlacement } from '@/types/commerce';
 
-// Temporary fallback data for development
-// In production, this would be replaced by backend API calls
-const fallbackCampaigns: Campaign[] = [
-  {
-    id: 'fallback-diwali-2024',
-    name: 'Diwali 2024 Campaign',
-    slug: 'diwali-2024',
-    occasion: 'diwali',
-    status: 'published' as const,
-    startsAt: '2024-10-20T00:00:00Z',
-    endsAt: '2024-11-15T23:59:59Z',
-    timezone: 'Asia/Kolkata',
-    placement: 'header_strip' as const,
-    priority: 1,
-    label: 'Diwali Specials',
-    message: 'Hosting this Diwali? Build the platter with our premium cuts',
-    ctaLabel: 'Shop Party Packs',
-    destinationType: 'category',
-    destinationValue: 'combos',
-    backgroundColor: '#FFF8F0',
-    foregroundColor: '#2D1810',
-    accentColor: '#C8860A',
-    buttonColor: '#B4232C',
-    buttonTextColor: '#FFFFFF',
-    desktopImageUrl: '/assets/campaigns/diwali-desktop.jpg',
-    mobileImageUrl: '/assets/campaigns/diwali-mobile.jpg',
-    posterImageUrl: '/assets/campaigns/diwali-poster.jpg',
-    altText: 'Diwali festival offer - premium meat platters',
-    targetLocations: [], // All locations
-    targetDevice: 'all',
-    analyticsCampaignId: 'diwali_2024_header',
-    createdBy: 'admin',
-    updatedBy: 'admin',
-    createdAt: '2024-09-01T10:00:00Z',
-    updatedAt: '2024-09-01T10:00:00Z',
-    publishedAt: '2024-09-01T10:00:00Z',
+const API_URL = import.meta.env.VITE_API_URL;
+
+// Helper to handle fetch responses
+async function handleFetchResponse(response: Response) {
+  if (!response.ok) {
+    // Try to get error message from body
+    let errorMessage = 'Failed to fetch';
+    try {
+      const errorData = await response.json();
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+    } catch (e) {
+      // ignore
+    }
+    throw new Error(errorMessage);
   }
-];
+  return response.json();
+}
 
 export const campaignApi = {
   getCampaigns: async (options?: {
@@ -49,61 +30,92 @@ export const campaignApi = {
     offset?: number;
   }): Promise<Campaign[]> => {
     try {
-      let results = [...fallbackCampaigns];
-
+      // Build query string
+      const params = new URLSearchParams();
       if (options?.status) {
-        results = results.filter(campaign => options.status!.includes(campaign.status));
+        options.status.forEach(status => params.append('status', status));
       }
       if (options?.occasion) {
-        results = results.filter(campaign => options.occasion!.includes(campaign.occasion));
+        options.occasion.forEach(occasion => params.append('occasion', occasion));
       }
       if (options?.placement) {
-        results = results.filter(campaign => options.placement!.includes(campaign.placement));
+        options.placement.forEach(placement => params.append('placement', placement));
       }
-      if (options?.activeOnly) {
-        const now = new Date();
-        results = results.filter(campaign => {
-          const start = new Date(campaign.startsAt);
-          const end = new Date(campaign.endsAt);
-          return campaign.status === 'published' && now >= start && now <= end;
-        });
-      }
-
-      if (options?.offset !== undefined) {
-        results = results.slice(options.offset);
+      if (options?.activeOnly !== undefined) {
+        params.append('activeOnly', String(options.activeOnly));
       }
       if (options?.limit !== undefined) {
-        results = results.slice(0, options.limit);
+        params.append('limit', String(options.limit));
+      }
+      if (options?.offset !== undefined) {
+        params.append('offset', String(options.offset));
       }
 
-      return results;
+      const query = params.toString();
+      const url = `${API_URL}/campaigns${query ? `?${query}` : ''}`;
+
+      const response = await fetch(url, {
+        credentials: 'include', // include cookies for auth
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await handleFetchResponse(response);
+      // Assuming the backend returns { success: true, data: Campaign[] }
+      if (data && data.data) {
+        return data.data;
+      }
+      // Fallback if structure is different
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Error fetching campaigns:', error);
-      return fallbackCampaigns;
+      throw error; // Re-throw so UI can show error state
     }
   },
 
   getCampaignById: async (id: string): Promise<Campaign | null> => {
     try {
-      const campaign = fallbackCampaigns.find(c => c.id === id);
-      return campaign ?? null;
+      const url = `${API_URL}/campaigns/${encodeURIComponent(id)}`;
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      const data = await handleFetchResponse(response);
+      if (data && data.data) {
+        return data.data;
+      }
+      return null;
     } catch (error) {
       console.error(`Error fetching campaign ${id}:`, error);
-      return null;
+      throw error;
     }
   },
 
   createCampaign: async (campaignData: Omit<Campaign, 'id' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'archivedAt'>): Promise<Campaign> => {
     try {
-      const newCampaign: Campaign = {
-        ...campaignData,
-        id: `campaign-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      const url = `${API_URL}/campaigns`;
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(campaignData),
+      });
 
-      fallbackCampaigns.push(newCampaign);
-      return newCampaign;
+      const data = await handleFetchResponse(response);
+      if (data && data.data) {
+        return data.data;
+      }
+      throw new Error('Invalid response from server');
     } catch (error) {
       console.error('Error creating campaign:', error);
       throw error;
@@ -112,17 +124,25 @@ export const campaignApi = {
 
   updateCampaign: async (id: string, campaignData: Partial<Campaign>): Promise<Campaign | null> => {
     try {
-      const index = fallbackCampaigns.findIndex(c => c.id === id);
-      if (index === -1) return null;
+      const url = `${API_URL}/campaigns/${encodeURIComponent(id)}`;
+      const response = await fetch(url, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(campaignData),
+      });
 
-      const updatedCampaign: Campaign = {
-        ...fallbackCampaigns[index],
-        ...campaignData,
-        updatedAt: new Date().toISOString(),
-      };
+      if (response.status === 404) {
+        return null;
+      }
 
-      fallbackCampaigns[index] = updatedCampaign;
-      return updatedCampaign;
+      const data = await handleFetchResponse(response);
+      if (data && data.data) {
+        return data.data;
+      }
+      throw new Error('Invalid response from server');
     } catch (error) {
       console.error(`Error updating campaign ${id}:`, error);
       throw error;
@@ -131,20 +151,29 @@ export const campaignApi = {
 
   deleteCampaign: async (id: string): Promise<boolean> => {
     try {
-      const index = fallbackCampaigns.findIndex(c => c.id === id);
-      if (index === -1) return false;
+      const url = `${API_URL}/campaigns/${encodeURIComponent(id)}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      fallbackCampaigns[index] = {
-        ...fallbackCampaigns[index],
-        status: 'archived' as const,
-        updatedAt: new Date().toISOString(),
-        archivedAt: new Date().toISOString(),
-      };
+      if (response.status === 404) {
+        return false;
+      }
 
-      return true;
+      if (!response.ok) {
+        throw new Error('Failed to delete campaign');
+      }
+
+      // Assuming backend returns { success: true }
+      const data = await response.json();
+      return data.success === true;
     } catch (error) {
       console.error(`Error deleting campaign ${id}:`, error);
-      return false;
+      throw error;
     }
   },
 
@@ -154,42 +183,36 @@ export const campaignApi = {
     device?: 'all' | 'desktop' | 'mobile';
   }): Promise<Campaign | null> => {
     try {
-      const now = options?.now ?? new Date();
-      const locationId = options?.locationId;
-      const device = options?.device ?? 'all';
+      // Build query string
+      const params = new URLSearchParams();
+      if (options?.now) {
+        params.append('now', options.now.toISOString());
+      }
+      if (options?.locationId) {
+        params.append('locationId', options.locationId);
+      }
+      if (options?.device) {
+        params.append('device', options.device);
+      }
 
-      const activeCampaigns = fallbackCampaigns.filter(campaign => {
-        if (campaign.status !== 'published') return false;
+      const query = params.toString();
+      const url = `${API_URL}/campaigns/active${query ? `?${query}` : ''}`;
 
-        const start = new Date(campaign.startsAt);
-        const end = new Date(campaign.endsAt);
-        if (now < start || now > end) return false;
-
-        if (campaign.targetLocations && campaign.targetLocations.length > 0) {
-          if (!locationId || !campaign.targetLocations.includes(locationId)) {
-            return false;
-          }
-        }
-
-        if (campaign.targetDevice && campaign.targetDevice !== 'all' && campaign.targetDevice !== device) {
-          return false;
-        }
-
-        return true;
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (activeCampaigns.length === 0) return null;
-
-      return activeCampaigns
-        .sort((a, b) => {
-          if (a.priority !== b.priority) {
-            return b.priority - a.priority;
-          }
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-        })[0];
+      const data = await handleFetchResponse(response);
+      if (data && data.data) {
+        return data.data;
+      }
+      return null;
     } catch (error) {
       console.error('Error resolving active campaign:', error);
-      return null;
+      throw error;
     }
   }
 };

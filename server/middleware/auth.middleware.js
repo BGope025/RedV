@@ -7,8 +7,9 @@ const { jwtSecret } = require('../config/env');
  */
 const protect = (req, res, next) => {
   try {
-    // Get token from cookies
-    const token = req.cookies?.token;
+    // Get token from cookies or Authorization header
+    console.log('Cookies received:', req.cookies);
+    const token = req.cookies?.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
 
     if (!token) {
       throw generateAuthError('Access denied. No token provided.');

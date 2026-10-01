@@ -94,6 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Backend authentication failed');
       }
+      
+      const data = await response.json();
+      if (data.data?.token) {
+        localStorage.setItem('adminToken', data.data.token);
+      }
     } catch (error) {
       console.error("Error signing in with Google:", error);
       throw error;
@@ -154,6 +159,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json();
       if (data.success && data.data?.user) {
+        if (data.data.token) {
+          localStorage.setItem('adminToken', data.data.token);
+        }
         setUser({
           uid: data.data.user.id.toString(),
           email: data.data.user.username,
@@ -176,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (auth) {
         await auth.signOut();
       }
+      localStorage.removeItem('adminToken');
       setUser(null);
       setConfirmationResult(null);
     } catch (error) {

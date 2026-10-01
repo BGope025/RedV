@@ -12,6 +12,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { assets } from '@/lib/assets';
+import { toast } from 'sonner';
 
 interface Slide {
   id: number;
@@ -96,7 +97,7 @@ export default function HeroSlideshow() {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     setReducedMotion(mediaQuery.matches);
 
-    const listener = (event) => {
+    const listener = (event: MediaQueryListEvent) => {
       setReducedMotion(event.matches);
     };
 
@@ -154,8 +155,8 @@ export default function HeroSlideshow() {
       ref={slideRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onFocusIn={handleFocusIn}
-      onFocusOut={handleFocusOut}
+      onFocus={handleFocusIn}
+      onBlur={handleFocusOut}
       tabIndex={-1}
       className="relative min-h-[520px] overflow-hidden rounded-[2rem] bg-[#17110f] text-white shadow-[0_24px_70px_rgba(46,24,20,.18)] sm:min-h-[560px] lg:min-h-[590px]"
     >
@@ -238,7 +239,7 @@ export default function HeroSlideshow() {
         </div>
 
         {/* Benefits Section (only on first slide) */}
-        {currentSlide.id === 1 && (
+        {currentSlideData.id === 1 && (
           <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-xs font-bold text-white/65">
             <span className="flex items-center gap-2">
               <BadgeCheck className="size-4 text-[#86CC68]" /> 4.9 Google rating · 275 reviews

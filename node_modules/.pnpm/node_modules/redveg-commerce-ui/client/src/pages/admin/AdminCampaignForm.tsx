@@ -32,41 +32,71 @@ const emptyCampaign: Partial<Campaign> = {
   collectionSubtitle: "",
 };
 
-export default function AdminCampaignForm() {
+interface AdminCampaignFormProps {
+  /** Campaign ID for edit mode */
+  campaignId?: string;
+  /** Pre-loaded campaign data (optional) */
+  campaign?: Campaign;
+  /** Callback when save is successful */
+  onSave?: (data: Campaign) => void;
+  /** Callback when form should be closed */
+  onClose?: () => void;
+}
+
+export default function AdminCampaignForm({ campaignId, campaign, onSave, onClose }: AdminCampaignFormProps = {}) {
   const [, navigate] = useLocation();
   const [match, params] = useRoute("/admin/campaigns/:id");
-  const isEditing = match && params?.id !== "new";
-  const campaignId = params?.id;
 
+  // Determine mode: props take precedence over route
+  const isEditingFromProps = campaignId !== undefined || campaign !== undefined;
+  const isEditingFromRoute = match && params?.id !== "new";
+  const isEditing = isEditingFromProps || isEditingFromRoute;
+
+  // Get the effective campaign ID for edit mode
+  const effectiveCampaignId = campaignId ?? (isEditingFromRoute ? params?.id : undefined);
+
+  // Form state
   const [formData, setFormData] = useState<Partial<Campaign>>(emptyCampaign);
-  const [loading, setLoading] = useState(isEditing);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Load campaign data for edit mode if not pre-loaded
   useEffect(() => {
-    if (isEditing && campaignId) {
+    if (isEditing && effectiveCampaignId && !campaign) {
       const loadCampaign = async () => {
+        setLoading(true);
+        setError(null);
         try {
-          const campaigns = await campaignApi.getCampaigns();
-          const campaign = campaigns.find(c => c.id === campaignId);
-          if (campaign) {
+          const data = await campaignApi.getCampaignById(effectiveCampaignId);
+          if (data) {
+            // Convert ISO timestamps to datetime-local format for form
             setFormData({
-              ...campaign,
-              startsAt: new Date(campaign.startsAt).toISOString().slice(0, 16),
-              endsAt: new Date(campaign.endsAt).toISOString().slice(0, 16),
+              ...data,
+              startsAt: new Date(data.startsAt).toISOString().slice(0, 16),
+              endsAt: new Date(data.endsAt).toISOString().slice(0, 16),
             });
           } else {
-            toast.error("Campaign not found");
-            navigate("/admin/settings"); // Or campaigns list if it exists
+            setError('Campaign not found');
+            if (onClose) onClose(); // Notify parent to close
           }
-        } catch (error) {
-          toast.error("Failed to load campaign");
+        } catch (err) {
+          setError('Failed to load campaign');
+          if (onClose) onClose();
         } finally {
           setLoading(false);
         }
       };
       loadCampaign();
+    } else if (campaign) {
+      // Use pre-loaded campaign data
+      setFormData({
+        ...campaign,
+        startsAt: new Date(campaign.startsAt).toISOString().slice(0, 16),
+        endsAt: new Date(campaign.endsAt).toISOString().slice(0, 16),
+      });
     }
-  }, [campaignId, isEditing, navigate]);
+  }, [isEditing, effectiveCampaignId, campaign, onClose]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -78,6 +108,7 @@ export default function AdminCampaignForm() {
 
   const handleSave = async (status: Campaign['status']) => {
     setSaving(true);
+    setError(null);
     try {
       const dataToSave = {
         ...formData,
@@ -86,22 +117,32 @@ export default function AdminCampaignForm() {
         endsAt: new Date(formData.endsAt!).toISOString(),
       } as Campaign;
 
-      if (isEditing) {
-        await campaignApi.updateCampaign(campaignId!, dataToSave);
+      let result: Campaign | null = null;
+      if (isEditing && effectiveCampaignId) {
+        result = await campaignApi.updateCampaign(effectiveCampaignId, dataToSave);
         toast.success("Campaign updated successfully");
       } else {
-        await campaignApi.createCampaign(dataToSave);
+        result = await campaignApi.createCampaign(dataToSave);
         toast.success("Campaign created successfully");
-        navigate("/admin/settings"); // Redirect to a safe place for now
       }
-    } catch (error) {
-      toast.error("Failed to save campaign");
+
+      if (result && onSave) {
+        onSave(result);
+      }
+      if (onClose) {
+        onClose();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to save campaign');
+      toast.error(err.message || 'Failed to save campaign');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <AdminShell title="Loading..." subtitle=""><div className="p-8">Loading...</div></AdminShell>;
+  if (loading) {
+    return <AdminShell title="Loading..." subtitle=""><div className="p-8">Loading...</div></AdminShell>;
+  }
 
   return (
     <AdminShell
@@ -109,18 +150,84 @@ export default function AdminCampaignForm() {
       subtitle="Configure seasonal banners and collections"
       action={
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => navigate("/admin/settings")}><ArrowLeft className="size-4 mr-2" /> Back</Button>
+          <Button variant="outline" onClick={() => {
+            if (onClose) onClose();
+          }}><ArrowLeft className="size-4 mr-2" /> Cancel</Button>
           <Button variant="outline" onClick={() => handleSave("draft")} disabled={saving}><Save className="size-4 mr-2" /> Save Draft</Button>
-          <Button onClick={() => handleSave("published")} disabled={saving} className="bg-[#B4232C] hover:bg-[#901c23] text-white">
+          <Button onClick={() => handleSave("published")} disabled={saving} className="bg-[#B4232C] hover-bg-[#901c23] text-white">
             Publish Campaign
           </Button>
         </div>
       }
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+        {/* Sidebar */}
+        <div className="space-y-8">
+          {/* Visual Theme */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+            <h3 className="text-lg font-bold flex items-center gap-2 mb-6"><Palette className="size-5 text-[#B4232C]" /> Visual Theme</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold">Background Color</label>
+                <div className="flex items-center gap-2">
+                  <Input type="color" name="backgroundColor" value={formData.backgroundColor || ""} onChange={handleChange} className="w-10 h-10 p-1" />
+                  <Input name="backgroundColor" value={formData.backgroundColor || ""} onChange={handleChange} className="w-24 font-mono text-xs" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold">Text Color</label>
+                <div className="flex items-center gap-2">
+                  <Input type="color" name="foregroundColor" value={formData.foregroundColor || ""} onChange={handleChange} className="w-10 h-10 p-1" />
+                  <Input name="foregroundColor" value={formData.foregroundColor || ""} onChange={handleChange} className="w-24 font-mono text-xs" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold">Accent Color</label>
+                <div className="flex items-center gap-2">
+                  <Input type="color" name="accentColor" value={formData.accentColor || ""} onChange={handleChange} className="w-10 h-10 p-1" />
+                  <Input name="accentColor" value={formData.accentColor || ""} onChange={handleChange} className="w-24 font-mono text-xs" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-4 border-t">
+                <label className="text-sm font-semibold">Button BG</label>
+                <div className="flex items-center gap-2">
+                  <Input type="color" name="buttonColor" value={formData.buttonColor || ""} onChange={handleChange} className="w-10 h-10 p-1" />
+                  <Input name="buttonColor" value={formData.buttonColor || ""} onChange={handleChange} className="w-24 font-mono text-xs" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold">Button Text</label>
+                <div className="flex items-center gap-2">
+                  <Input type="color" name="buttonTextColor" value={formData.buttonTextColor || ""} onChange={handleChange} className="w-10 h-10 p-1" />
+                  <Input name="buttonTextColor" value={formData.buttonTextColor || ""} onChange={handleChange} className="w-24 font-mono text-xs" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Targeting */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+            <h3 className="text-lg font-bold flex items-center gap-2 mb-6"><Target className="size-5 text-[#B4232C]" /> Targeting</h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Priority (Higher overrides lower)</label>
+                <Input type="number" name="priority" value={formData.priority || 10} onChange={handleChange} min={0} max={100} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Target Devices</label>
+                <select name="targetDevice" value={formData.targetDevice || "all"} onChange={handleChange} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                  <option value="all">All Devices</option>
+                  <option value="desktop">Desktop Only</option>
+                  <option value="mobile">Mobile Only</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
-          
+
           {/* Basic Info */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
             <h3 className="text-lg font-bold flex items-center gap-2 mb-6"><LayoutTemplate className="size-5 text-[#B4232C]" /> Basic Info & Schedule</h3>
