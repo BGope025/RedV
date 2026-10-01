@@ -132,10 +132,36 @@ const getAdminProducts = async (req, res) => {
   try {
     const db = await getDatabaseConnection('catalog');
 
-    const result = await db.execute({
-      sql: "SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count FROM products p LEFT JOIN variants v ON p.id = v.product_id ORDER BY p.created_at DESC",
-      args: []
-    });
+    // Add pagination and searching parameters
+    const search = req.query.q ? req.query.q.trim() : '';
+    const limit = parseInt(req.query.limit, 10) || null;
+    const offset = parseInt(req.query.offset, 10) || 0;
+
+    let filterClause = '';
+    const args = [];
+    if (search) {
+      filterClause = " WHERE p.name LIKE ? OR p.description LIKE ?";
+      args.push(`%${search}%`, `%${search}%`);
+    }
+
+    let sql = `
+      SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count
+      FROM (
+        SELECT p.*
+        FROM products p
+        ${filterClause}
+        ORDER BY p.created_at DESC
+        ${limit ? 'LIMIT ? OFFSET ?' : ''}
+      ) p
+      LEFT JOIN variants v ON p.id = v.product_id
+      ORDER BY p.created_at DESC
+    `;
+
+    if (limit) {
+      args.push(limit, offset);
+    }
+
+    const result = await db.execute({ sql, args });
 
     const productsMap = new Map();
     const variantsMap = new Map();
