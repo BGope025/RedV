@@ -15,6 +15,9 @@ if (!process.env.TURSO_CATALOG_URL && !process.env.DATA_PATH) {
 if (!process.env.TURSO_ORDERS_URL && !process.env.DATA_PATH) {
   requiredEnvVars.push('TURSO_ORDERS_URL');
 }
+if (!process.env.TURSO_CUSTOMER_URL && !process.env.DATA_PATH) {
+  requiredEnvVars.push('TURSO_CUSTOMER_URL');
+}
 
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
@@ -34,6 +37,10 @@ module.exports = {
   // Turso Orders DB
   ordersDbUrl: process.env.TURSO_ORDERS_URL,
   ordersDbAuthToken: process.env.TURSO_ORDERS_AUTH_TOKEN,
+
+  // Turso Customers DB
+  customerDbUrl: process.env.TURSO_CUSTOMER_URL,
+  customerDbAuthToken: process.env.TURSO_CUSTOMER_AUTH_TOKEN,
 
   // Cloudinary
   cloudinary: {

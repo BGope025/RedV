@@ -1,0 +1,196 @@
+const { getDatabaseConnection } = require('../../../config/turso');
+const { generateNotFoundError, generateValidationError } = require('../../../utils/error-classes');
+const logger = require('../../../utils/logger');
+
+/**
+ * Get settings by type
+ * @route GET /api/v1/settings/:type
+ */
+const getSetting = async (req, res) => {
+  try {
+    const { type } = req.params;
+    
+    // Validate type
+    if (!type) {
+      throw generateValidationError('Settings type is required');
+    }
+
+    const db = await getDatabaseConnection('catalog');
+
+    // Get setting by type
+    const result = await db.execute({
+      sql: 'SELECT * FROM settings WHERE type = ? LIMIT 1',
+      args: [type]
+    });
+
+    if (result.rows.length === 0) {
+      // Return default values based on type
+      let defaultValue = null;
+      if (type === 'header-theme') {
+        defaultValue = 'default';
+      }
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          type,
+          value: defaultValue
+        }
+      });
+    }
+
+    const setting = result.rows[0];
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        type: setting.type,
+        value: setting.value
+      }
+    });
+  } catch (error) {
+    if (error.type === 'validation-error') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    logger.error('Error fetching setting:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Update or create setting
+ * @route PUT /api/v1/settings/:type
+ */
+const upsertSetting = async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { value } = req.body;
+
+    // Validate input
+    if (!type) {
+      throw generateValidationError('Settings type is required');
+    }
+    
+    if (value === undefined) {
+      throw generateValidationError('Settings value is required');
+    }
+
+    // Only allow certain types to be updated via this endpoint
+    const allowedTypes = ['header-theme'];
+    if (!allowedTypes.includes(type)) {
+      throw generateValidationError(`Settings type "${type}" is not updatable via this endpoint`);
+    }
+
+    const db = await getDatabaseConnection('catalog');
+
+    // Check if setting already exists
+    const existing = await db.execute({
+      sql: 'SELECT id FROM settings WHERE type = ? LIMIT 1',
+      args: [type]
+    });
+
+    if (existing.rows.length > 0) {
+      // Update existing setting
+      await db.execute({
+        sql: 'UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE type = ?',
+        args: [value, type]
+      });
+      
+      logger.info(`Setting updated: ${type}`);
+    } else {
+      // Create new setting
+      await db.execute({
+        sql: 'INSERT INTO settings (type, value, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
+        args: [type, value]
+      });
+      
+      logger.info(`Setting created: ${type}`);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Setting ${type} saved successfully`,
+      data: {
+        type,
+        value
+      }
+    });
+  } catch (error) {
+    if (error.type === 'validation-error') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    logger.error('Error saving setting:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Delete setting (reset to default)
+ * @route DELETE /api/v1/settings/:type
+ */
+const deleteSetting = async (req, res) => {
+  try {
+    const { type } = req.params;
+
+    // Validate input
+    if (!type) {
+      throw generateValidationError('Settings type is required');
+    }
+
+    // Only allow certain types to be deleted via this endpoint
+    const allowedTypes = ['header-theme'];
+    if (!allowedTypes.includes(type)) {
+      throw generateValidationError(`Settings type "${type}" is not deletable via this endpoint`);
+    }
+
+    const db = await getDatabaseConnection('catalog');
+
+    // Delete setting
+    await db.execute({
+      sql: 'DELETE FROM settings WHERE type = ?',
+      args: [type]
+    });
+
+    logger.info(`Setting deleted: ${type}`);
+
+    res.status(200).json({
+      success: true,
+      message: `Setting ${type} reset to default`
+    });
+  } catch (error) {
+    if (error.type === 'validation-error') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    logger.error('Error deleting setting:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+module.exports = {
+  getSetting,
+  upsertSetting,
+  deleteSetting
+};
+
+

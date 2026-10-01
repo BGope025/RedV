@@ -1,5 +1,3 @@
-const { v4: uuidv4 } = require('uuid');
-
 /**
  * Generate a clean order ID in the format: #RV-XXXX
  * Where XXXX is a random 4-digit number
@@ -34,6 +32,24 @@ const generateVariantId = () => {
 const generateUserId = () => {
   const randomNum = Math.floor(1000 + Math.random() * 9000); // 4-digit number (1000-9999)
   return `USR-${randomNum}`;
+};
+
+/**
+ * Generate a clean UI ID in the format: UI-XXXX
+ * Where XXXX is a random 4-digit number
+ */
+const generateUiId = () => {
+  const randomNum = Math.floor(1000 + Math.random() * 9000); // 4-digit number (1000-9999)
+  return `UI-${randomNum}`;
+};
+
+/**
+ * Generate a clean campaign ID in the format: CAMP-XXXX
+ * Where XXXX is a random 4-digit number
+ */
+const generateCampaignId = () => {
+  const randomNum = Math.floor(1000 + Math.random() * 9000); // 4-digit number (1000-9999)
+  return `CAMP-${randomNum}`;
 };
 
 /**
@@ -86,5 +102,7 @@ module.exports = {
   generateProductId,
   generateVariantId,
   generateUserId,
+  generateUiId,
+  generateCampaignId,
   generateCartSnapshot
 };

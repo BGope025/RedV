@@ -25,14 +25,17 @@ const login = async (req, res) => {
 
     // Get database connection
     const db = await getDatabaseConnection('orders'); // Users table is in ordersDb
+    logger.info(`Database connection obtained for orders db`);
 
     // Find user
     const userResult = await db.execute({
       sql: 'SELECT id, username, password_hash, role FROM users WHERE username = ?',
       args: [username]
     });
+    logger.info(`Query executed for username: ${username}, found ${userResult.rows.length} users`);
 
     if (userResult.rows.length === 0) {
+      logger.info(`User not found: ${username}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -40,9 +43,13 @@ const login = async (req, res) => {
     }
 
     const user = userResult.rows[0];
+    logger.info(`User found: ${user.username}, hash: ${user.password_hash.substring(0, 20)}...`);
 
     // Verify password
+    logger.info(`Comparing password: ${password}`);
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    logger.info(`Password comparison result: ${isPasswordValid}`);
+
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -119,4 +126,52 @@ const logout = (req, res) => {
   }
 };
 
-module.exports = { login, logout };
+/**
+ * Validate token endpoint
+ * @route GET /api/v1/auth/validate
+ */
+const validate = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify token
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (err) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token'
+        });
+      }
+
+      // Token is valid, return user info
+      res.status(200).json({
+        success: true,
+        message: 'Token is valid',
+        data: {
+          user: {
+            id: decoded.userId,
+            username: decoded.username,
+            role: decoded.role
+          }
+        }
+      });
+    });
+  } catch (error) {
+    logger.error('Token validation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+module.exports = { login, logout, validate };
+

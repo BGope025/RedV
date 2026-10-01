@@ -1,0 +1,63 @@
+const { getDatabaseConnection } = require('../../../config/turso');
+const logger = require('../../../utils/logger');
+
+/**
+ * Get all unique categories
+ * @route GET /api/v1/categories
+ */
+const getAllCategories = async (req, res) => {
+  try {
+    const db = await getDatabaseConnection('catalog');
+
+    // Get distinct categories from products table
+    const result = await db.execute({
+      sql: "SELECT DISTINCT category FROM products WHERE is_active = 1 AND category IS NOT NULL AND category != '' ORDER BY category",
+      args: []
+    });
+
+    // Format categories for frontend consumption
+    // Return array directly to match frontend expectations
+    const categories = result.rows.map((row, index) => {
+      // Generate a simple ID from category name
+      const id = row.category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+      // Provide basic category info
+      const categoryData = {
+        id: id,
+        name: row.category.charAt(0).toUpperCase() + row.category.slice(1).toLowerCase(),
+        description: `${row.category} products`,
+        image: `/placeholder-${id}.jpg`,
+        accent: getRandomAccentColor(index)
+      };
+
+      return categoryData;
+    });
+
+    res.status(200).json(categories);
+  } catch (error) {
+    logger.error('Error fetching categories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Helper function to generate varied accent colors for categories
+function getRandomAccentColor(index) {
+  const colors = [
+    '#DCEED8', // Fish - greenish
+    '#FBE0D6', // Chicken - peach
+    '#F3D8D5', // Mutton - light red
+    '#F8E7C9', // Prawns - beige
+    '#D8E8EA', // Seafood - light blue
+    '#E5E0D7'  // Combos - neutral
+  ];
+  return colors[index % colors.length] || '#DCEED8';
+}
+
+module.exports = {
+  getAllCategories
+};
+
+

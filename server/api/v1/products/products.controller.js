@@ -12,13 +12,8 @@ const getAllProducts = async (req, res) => {
     const db = await getDatabaseConnection('catalog');
 
     const result = await db.execute({
-      sql: `
-        SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count
-        FROM products p
-        LEFT JOIN variants v ON p.id = v.product_id
-        WHERE p.is_active = 1
-        ORDER BY p.created_at DESC
-      `
+      sql: "SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count FROM products p LEFT JOIN variants v ON p.id = v.product_id WHERE p.is_active = 1 ORDER BY p.created_at DESC",
+      args: []
     });
 
     // Group variants by product
@@ -55,11 +50,7 @@ const getAllProducts = async (req, res) => {
 
     const products = Array.from(productsMap.values());
 
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      data: products
-    });
+    res.status(200).json(products);
   } catch (error) {
     logger.error('Error fetching products:', error);
     res.status(500).json({
@@ -69,10 +60,6 @@ const getAllProducts = async (req, res) => {
   }
 };
 
-/**
- * Get product by ID
- * @route GET /api/v1/products/:id
- */
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -152,7 +139,6 @@ const createProduct = async (req, res) => {
       message: 'Product created successfully',
       data: {
         id: productId,
-        name,
         name,
         description,
         category,
@@ -323,3 +309,4 @@ module.exports = {
   updateProduct,
   deleteProduct
 };
+

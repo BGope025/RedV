@@ -21,12 +21,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 initializeDatabaseConnections();
 
 // Initialize Cloudinary
-    // Request logging middleware
-    app.use((req, res, next) => {
-      console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-      next();
-    });
 initializeCloudinary();
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 app.use("/", frontendRouter);
 
 // API routes

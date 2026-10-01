@@ -30,7 +30,7 @@ const executeCrossDbSaga = async (orderId, adminId) => {
 
     const orderResult = await ordersDb.execute({
       sql: `
-        SELECT id, user_id, cart_snapshot, total_amount, customer_name,
+        SELECT id, user_id, customer_id, cart_snapshot, total_amount, customer_name,
                customer_phone, customer_address, status, is_archived
         FROM orders
         WHERE id = ? AND is_archived = 0

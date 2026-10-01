@@ -18,3 +18,4 @@ router.post('/upload/products', uploadMiddleware.single('image'), uploadProductI
 router.post('/upload/ui', uploadMiddleware.single('file'), uploadUiAsset);
 
 module.exports = router;
+
