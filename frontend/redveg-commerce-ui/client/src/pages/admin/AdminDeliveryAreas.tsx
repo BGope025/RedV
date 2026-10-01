@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
 import { MapPinned, Loader2, RefreshCw } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { apiUrl } from '@/lib/api';
 
 interface DeliveryLocation {
   pincode: string;
@@ -46,7 +47,8 @@ export default function AdminDeliveryAreas() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/v1/admin/delivery-locations', {
+      const apiUrlStr = apiUrl('admin/delivery-locations');
+      const response = await fetch(apiUrlStr, {
         method: 'GET',
         credentials: 'include'
       });
@@ -70,7 +72,8 @@ export default function AdminDeliveryAreas() {
     const pincode = location.pincode;
     setUpdating(prev => new Set(prev).add(pincode));
     try {
-      const response = await fetch(`/api/v1/admin/delivery-locations/${pincode}/availability`, {
+      const apiUrlStr = apiUrl(`admin/delivery-locations/${pincode}/availability`);
+      const response = await fetch(apiUrlStr, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -226,9 +229,6 @@ export default function AdminDeliveryAreas() {
                     State
                   </th>
                   <th className="px-4 py-3 text-left text-[0.68rem] font-bold text-foreground">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-[0.68rem] font-bold text-foreground">
                     Last Updated
                   </th>
                   <th className="px-4 py-3 text-left text-[0.68rem] font-bold text-foreground">
@@ -251,18 +251,7 @@ export default function AdminDeliveryAreas() {
                     <td className="px-4 py-3 text-[0.68rem] text-foreground">
                       {loc.state}
                     </td>
-                    <td className="px-4 py-3 flex items-center gap-2">
-                      {loc.isServiceable ? (
-                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-[0.62rem]">
-                          Available
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-[0.62rem]">
-                          Unavailable
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-[0.62rem] text-muted-foreground">
+                    <td className="px-4 py-3 text-[0.68rem] text-[0.68rem] text-left text-[0.68rem] font-bold text-foreground">
                       {loc.updatedAt ? new Date(loc.updatedAt).toLocaleString() : '-'}
                     </td>
                     <td className="px-4 py-3">

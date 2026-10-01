@@ -9,6 +9,7 @@ import {
   type ConfirmationResult,
 } from "firebase/auth";
 import { auth, googleProvider, isFirebaseConfigured } from "@/lib/firebase";
+import { apiUrl } from "@/lib/api";
 
 interface User {
   uid: string;
@@ -75,12 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      
+
       // Get the ID token from Firebase
       const idToken = await result.user.getIdToken();
-      
+
       // Send token to backend to establish admin session
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/oauth/google`, {
+      const response = await fetch(apiUrl('auth/oauth/google'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -88,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: 'include',
         body: JSON.stringify({ idToken })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Backend authentication failed');
@@ -131,20 +132,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Simple email/password login (demo mode when Firebase is not configured)
+  // Email/password login via backend
   const login = async (credentials: { email: string; password: string }) => {
-    // Demo login for admin access without Firebase
-    if (credentials.email === "admin@redveg.com" && credentials.password === "admin123") {
-      setUser({
-        uid: "demo-admin",
-        email: credentials.email,
-        phoneNumber: null,
-        displayName: "Admin",
-        photoURL: null,
+    try {
+      const response = await fetch(apiUrl('auth/login'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: credentials.email,
+          password: credentials.password
+        })
       });
-      return;
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      const data = await response.json();
+      if (data.success && data.data?.user) {
+        setUser({
+          uid: data.data.user.id.toString(),
+          email: data.data.user.username,
+          phoneNumber: null,
+          displayName: data.data.user.username,
+          photoURL: null,
+        });
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (error) {
+      console.error('Error logging in:', error);
+      throw error;
     }
-    throw new Error("Invalid credentials");
   };
 
   // Sign out user

@@ -1,4 +1,5 @@
 import type { DeliveryLocation } from '@/contexts/LocationContext';
+import { apiUrl } from '@/lib/api';
 
 interface ApiResponse {
   success: boolean;
@@ -20,7 +21,8 @@ export const deliveryLocationApi = {
       if (serviceableOnly) {
         params.append('serviceableOnly', 'true');
       }
-      const response = await fetch(`/api/v1/delivery-locations/search?${params.toString()}`, {
+      const apiUrlStr = apiUrl(`delivery-locations/search?${params.toString()}`);
+      const response = await fetch(apiUrlStr, {
         method: 'GET',
         credentials: 'include'
       });
@@ -55,7 +57,8 @@ export const deliveryLocationApi = {
    */
   async reverseGeocode(latitude: number, longitude: number): Promise<DeliveryLocation> {
     try {
-      const response = await fetch(`/api/v1/delivery-locations/reverse-geocode`, {
+      const apiUrlStr = apiUrl(`delivery-locations/reverse-geocode`);
+      const response = await fetch(apiUrlStr, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ latitude, longitude }),

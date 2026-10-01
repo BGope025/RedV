@@ -17,6 +17,8 @@ const campaignsRoutes = require('./v1/campaigns/campaigns.routes');
 const deliveryLocationsRoutes = require('./v1/delivery-locations/delivery-locations.routes');
 const statsRoutes = require('./v1/stats/stats.routes');
 const adminDeliveryLocationsRoutes = require('./v1/admin/delivery-locations/delivery-locations.routes');
+const adminProductsRoutes = require('./v1/admin/products/products.routes');
+const adminVariantsRoutes = require('./v1/admin/variants/variants.routes');
 
 // Mount all routes
 router.use('/auth', authRoutes);
@@ -34,6 +36,8 @@ router.use('/campaigns', campaignsRoutes);
 router.use('/delivery-locations', deliveryLocationsRoutes);
 router.use('/stats', statsRoutes);
 router.use('/admin/delivery-locations', adminDeliveryLocationsRoutes);
+router.use('/admin/products', adminProductsRoutes);
+router.use('/admin/variants', adminVariantsRoutes);
 
 // Health check endpoint (for Render.com sleep prevention)
 router.get('/health/ping', (req, res) => {

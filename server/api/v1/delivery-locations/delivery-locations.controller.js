@@ -205,65 +205,74 @@ const reverseGeocode = async (req, res) => {
       throw generateValidationError('Latitude and longitude must be numbers');
     }
 
-    // For demonstration, we return a fixed location if coordinates are near Kolkata
+    // Validate coordinate ranges
+    if (latitude < -90 || latitude > 90) {
+      throw generateValidationError('Latitude must be between -90 and 90 degrees');
+    }
+
+    if (longitude < -180 || longitude > 180) {
+      throw generateValidationError('Longitude must be between -180 and 180 degrees');
+    }
+
     // In a real implementation, you would call a geocoding service (e.g., Google Maps)
     // and then validate the resulting pincode against the database.
-    const KOLKATA_LAT_MIN = 22.4;
-    const KOLKATA_LAT_MAX = 22.8;
-    const KOLKATA_LNG_MIN = 88.2;
-    const KOLKATA_LNG_MAX = 88.6;
+    // Since we don't have a reverse geocoding provider configured in this environment,
+    // we return a clear message indicating that pincode search is required instead.
 
-    if (latitude >= KOLKATA_LAT_MIN && latitude <= KOLKATA_LAT_MAX &&
-        longitude >= KOLKATA_LNG_MIN && longitude <= KOLKATA_LNG_MAX) {
-      // Return a known serviceable location in Kolkata
-      const db = await getDatabaseConnection('availablePincodes');
-      const result = await db.execute({
-        sql: 'SELECT * FROM available_pincodes WHERE pincode = ? AND is_serviceable = 1 LIMIT 1',
-        args: ['700065'] // Dumdum
+    // Check if reverse geocoding is configured (in a real app, this would come from env vars)
+    const reverseGeocodingEnabled = false; // Set to true when provider is configured
+
+    if (!reverseGeocodingEnabled) {
+      return res.status(200).json({
+        success: false,
+        code: 'LOCATION_VERIFICATION_UNAVAILABLE',
+        message: 'We detected your location but could not verify delivery availability. Search by pincode instead.'
       });
-
-      if (result.rows.length === 0) {
-        // Fallback to first serviceable location
-        const fallbackResult = await db.execute({
-          sql: 'SELECT * FROM available_pincodes WHERE is_serviceable = 1 LIMIT 1',
-          args: []
-        });
-        if (fallbackResult.rows.length === 0) {
-          throw generateNotFoundError('No serviceable locations found');
-        }
-        const location = fallbackResult.rows[0];
-        res.status(200).json({
-          success: true,
-          data: {
-            pincode: location.pincode,
-            area: location.area || '',
-            city: location.city || '',
-            state: location.state || '',
-            isServiceable: location.is_serviceable === 1,
-            latitude: location.latitude,
-            longitude: location.longitude
-          }
-        });
-      } else {
-        const location = result.rows[0];
-        res.status(200).json({
-          success: true,
-          data: {
-            pincode: location.pincode,
-            area: location.area || '',
-            city: location.city || '',
-            state: location.state || '',
-            isServiceable: location.is_serviceable === 1,
-            latitude: location.latitude,
-            longitude: location.longitude
-          }
-        });
-      }
-    } else {
-      // Coordinates outside Kolkata area - return error or default?
-      // For simplicity, we return an error.
-      throw generateValidationError('Coordinates outside service area');
     }
+
+    // If reverse geocoding was enabled, we would:
+    // 1. Call the geocoding service to get a pincode from the coordinates
+    // 2. Validate that pincode against our database
+    // 3. Return whether it's serviceable
+
+    // For demonstration purposes in this environment, we'll simulate what would happen
+    // if we had a provider that returned a specific pincode
+
+    // Simulate getting a pincode from coordinates (this would come from the geocoding service)
+    // In reality, you'd replace this with actual geocoding service call
+    const simulatedPincodeFromCoordinates = '700065'; // Example: Dumdum
+
+    // Verify the pincode against our database
+    const db = await getDatabaseConnection('availablePincodes');
+    const result = await db.execute({
+      sql: 'SELECT * FROM available_pincodes WHERE pincode = ?',
+      args: [simulatedPincodeFromCoordinates]
+    });
+
+    if (result.rows.length === 0) {
+      // Pincode not found in our database
+      return res.status(200).json({
+        success: false,
+        code: 'LOCATION_NOT_FOUND',
+        message: 'The location detected could not be found in our service database. Please search by pincode instead.'
+      });
+    }
+
+    const location = result.rows[0];
+
+    // Never mark an unavailable pincode as deliverable
+    res.status(200).json({
+      success: true,
+      data: {
+        pincode: location.pincode,
+        area: location.area || '',
+        city: location.city || '',
+        state: location.state || '',
+        isServiceable: location.is_serviceable === 1,
+        latitude: location.latitude,
+        longitude: location.longitude
+      }
+    });
   } catch (error) {
     if (error.type === 'validation-error') {
       return res.status(400).json({
@@ -293,4 +302,3 @@ module.exports = {
   searchLocations,
   reverseGeocode
 };
-

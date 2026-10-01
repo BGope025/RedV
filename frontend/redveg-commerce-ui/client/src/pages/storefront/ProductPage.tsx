@@ -5,6 +5,7 @@ import { useCart } from "@/contexts/CartContext";
 import { BadgeCheck, ChevronLeft, Clock3, MapPin, Minus, Plus, ShieldCheck, Star, ThermometerSnowflake } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { apiUrl } from "@/lib/api";
 import { Link, useRoute } from "wouter";
 
 export default function ProductPage() {
@@ -14,28 +15,50 @@ export default function ProductPage() {
   const [variantId, setVariantId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProductData = async () => {
       try {
         setLoading(true);
+        setError(null);
 
-        // Fetch all products
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/products`);
+        // Fetch all products (could be optimized to fetch just one, but we need related products too)
+        const response = await fetch(apiUrl('products'));
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const productsData = await response.json();
+        
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("API returned non-JSON response");
+        }
+        
+        let productsData = await response.json();
+        productsData = productsData.data || productsData; // Handle new JSON format { success, count, data }
+
+        if (!Array.isArray(productsData)) {
+          throw new Error("Invalid products data format");
+        }
 
         // Find the product by slug
         const productSlug = params?.slug ?? "";
-        const foundProduct = productsData.find((entry) => entry.slug === productSlug) ?? productsData[0] ?? null;
+        const foundProduct = productsData.find((entry) => entry.slug === productSlug) ?? null;
+        
+        if (!foundProduct) {
+          setError("Product not found");
+          return;
+        }
+        
         setProduct(foundProduct);
 
-        // Set default variant if product exists
-        if (foundProduct) {
+        // Set default variant if product exists and has variants
+        if (foundProduct && foundProduct.variants && foundProduct.variants.length > 0) {
           const availableVariant = foundProduct.variants.find((variant) => variant.available);
           setVariantId(availableVariant?.id ?? foundProduct.variants[0]?.id ?? "");
+        } else if (foundProduct) {
+          // Edge case: product with no variants
+          setVariantId("");
         }
 
         // Find related products (same category or featured, excluding current product)
@@ -46,8 +69,9 @@ export default function ProductPage() {
           ).slice(0, 4);
           setRelated(relatedProducts);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching product data:", error);
+        setError(error.message);
         toast.error("Failed to load product details");
       } finally {
         setLoading(false);
@@ -57,11 +81,25 @@ export default function ProductPage() {
     fetchProductData();
   }, [params?.slug]);
 
-  if (loading || !product) {
+  if (loading) {
     return (
       <StoreShell>
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+        </div>
+      </StoreShell>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <StoreShell>
+        <div className="container py-12 text-center">
+          <div className="rounded-[1.5rem] border border-dashed border-red-200 bg-red-50/50 px-6 py-16">
+            <h3 className="font-black text-red-600">Product not found</h3>
+            <p className="mt-2 text-sm text-red-800/80">{error || "The product you're looking for doesn't exist or is currently unavailable."}</p>
+            <Link href="/shop" className="mt-6 inline-block rounded-full bg-red-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-red-700">Back to shop</Link>
+          </div>
         </div>
       </StoreShell>
     );

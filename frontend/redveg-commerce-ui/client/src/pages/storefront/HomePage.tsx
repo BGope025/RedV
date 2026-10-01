@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import HeroSlideshow from "@/components/HeroSlideshow";
 import { useCampaign } from "@/contexts/CampaignContext";
+import { apiUrl } from "@/lib/api";
 
 const promises = [
   { icon: ThermometerSnowflake, title: "Freshness locked", text: "Temperature-controlled handling from source to doorstep." },
@@ -26,15 +27,16 @@ export default function HomePage() {
         setLoading(true);
 
         // Fetch categories
-        const categoriesResponse = await fetch(`${import.meta.env.VITE_API_URL}/categories`);
+        const categoriesResponse = await fetch(apiUrl('categories'));
         if (!categoriesResponse.ok) throw new Error(`Failed to fetch categories: ${categoriesResponse.status}`);
         const categoriesData = await categoriesResponse.json();
         setCategories(categoriesData);
 
         // Fetch products
-        const productsResponse = await fetch(`${import.meta.env.VITE_API_URL}/products`);
+        const productsResponse = await fetch(apiUrl('products'));
         if (!productsResponse.ok) throw new Error(`Failed to fetch products: ${productsResponse.status}`);
-        const productsData = await productsResponse.json();
+        let productsData = await productsResponse.json();
+        productsData = productsData.data || productsData;
         setProducts(productsData);
       } catch (error) {
         console.error("Error fetching home page data:", error);

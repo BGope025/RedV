@@ -6,6 +6,7 @@ import type { Order, OrderStatus } from "@/types/commerce";
 import { ChevronDown, Download, Filter, MapPin, MessageCircle, Phone, Search, X } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
+import { apiUrl } from "@/lib/api";
 
 const statuses: OrderStatus[] = ["New", "Confirmed", "Processing", "Out for Delivery", "Delivered", "Cancelled"];
 
@@ -20,7 +21,7 @@ export default function AdminOrders() {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/orders`);
+        const response = await fetch(apiUrl('orders'));
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -131,11 +132,9 @@ export default function AdminOrders() {
                     <tr key={order.id} className="border-b border-black/5 transition hover:bg-[#FCFAF7]">
                       <td className="px-4 py-4">
                         <p className="font-black">{order.id}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{order.placedAt}</p>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="text-sm font-bold">{order.customer}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{order.mobile}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{order.placedAt}</p>
                       </td>
                       <td className="px-4 py-4 text-sm font-bold">{order.itemCount}</td>
                       <td className="px-4 py-4 text-xs font-bold text-muted-foreground">{order.source}</td>

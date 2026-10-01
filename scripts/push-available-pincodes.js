@@ -1,4 +1,4 @@
-const { getDatabaseConnection } = require('../server/config/turso');
+const { getDatabaseConnection, initializeDatabaseConnections } = require('../server/config/turso');
 const { generateValidationError } = require('../server/utils/error-classes');
 
 const PINCODE_DATA = [
@@ -78,6 +78,9 @@ async function run() {
   let db;
 
   try {
+    console.log('Initializing database connections...');
+    await initializeDatabaseConnections();
+
     console.log('Connecting to Turso database for available pincodes...');
     db = await getDatabaseConnection('availablePincodes');
     console.log('Connected successfully');
@@ -94,7 +97,7 @@ async function run() {
         latitude REAL,
         longitude REAL,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -139,7 +142,7 @@ async function run() {
           continue;
         }
 
-        // Upsert the record
+        // Upsert the record - preserve existing is_serviceable values (don't overwrite admin availability settings)
         const result = await db.execute({
           sql: `
             INSERT INTO available_pincodes
@@ -149,7 +152,6 @@ async function run() {
               area = excluded.area,
               city = excluded.city,
               state = excluded.state,
-              is_serviceable = excluded.is_serviceable,
               latitude = excluded.latitude,
               longitude = excluded.longitude,
               updated_at = CURRENT_TIMESTAMP
@@ -157,7 +159,7 @@ async function run() {
           args: [pincode, area, city, state, isServiceable ? 1 : 0, latitude, longitude]
         });
 
-        if result.rowsAffected > 0 {
+        if (result.rowsAffected > 0) {
           importedCount++;
         } else {
           skippedCount++;
