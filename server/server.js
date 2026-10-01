@@ -1,6 +1,6 @@
+require('dotenv').config();
 const http = require('http');
 const app = require('./app');
-require('dotenv').config();
 
 const PORT = process.env.PORT || 3000;
 
@@ -12,3 +12,4 @@ server.listen(PORT, () => {
 
 module.exports = server;
 // nodemon trigger
+// touch

@@ -1,12 +1,14 @@
 const { getDatabaseConnection } = require('../../../../config/turso');
 const { generateNotFoundError, generateValidationError } = require('../../../../utils/error-classes');
 const logger = require('../../../../utils/logger');
-const { protect } = require('../../../../middleware/auth.middleware');
 
 /**
  * Get all delivery locations (including unavailable) for admin
  * @route GET /api/v1/admin/delivery-locations
  */
+const { createClient } = require('@libsql/client');
+require('dotenv').config();
+
 const getAllLocations = async (req, res) => {
   try {
     const { limit, offset } = req.query;
@@ -14,7 +16,6 @@ const getAllLocations = async (req, res) => {
     let sql = 'SELECT * FROM available_pincodes';
     const args = [];
 
-    // Add pagination
     if (limit !== undefined) {
       sql += ' LIMIT ?';
       args.push(parseInt(limit));
@@ -25,10 +26,12 @@ const getAllLocations = async (req, res) => {
       args.push(parseInt(offset));
     }
 
-    const db = await getDatabaseConnection('availablePincodes');
-    const result = await db.execute({ sql, args });
+    const db = createClient({
+      url: process.env.AVAILABLE_PINCODES_DB_URL,
+      authToken: process.env.AVAILABLE_PINCODES_DB_AUTH_TOKEN
+    });
+    const result = args.length > 0 ? await db.execute({ sql, args }) : await db.execute(sql);
 
-    // Format for frontend compatibility
     const locations = result.rows.map(location => ({
       pincode: location.pincode,
       area: location.area || '',
@@ -43,7 +46,7 @@ const getAllLocations = async (req, res) => {
     res.status(200).json({
       success: true,
       count: locations.length,
-      total: locations.length, // total same as count for now, but we could have total separate if we had filtered counts
+      total: locations.length,
       serviceableCount: locations.filter(loc => loc.isServiceable).length,
       data: locations
     });
@@ -82,19 +85,7 @@ const updateAvailability = async (req, res) => {
       throw generateValidationError('isServiceable must be a boolean');
     }
 
-    const db = await getDatabaseConnection('availablePincodes');
-    // First, check if the pincode exists
-    const checkResult = await db.execute({
-      sql: 'SELECT * FROM available_pincodes WHERE pincode = ?',
-      args: [pincode]
-    });
-
-    if (checkResult.rows.length === 0) {
-      throw generateNotFoundError('Delivery location not found');
-    }
-
-    // Update the availability and updated_at
-    const result = await db.execute({
+    console.log('URL IS:', process.env.AVAILABLE_PINCODES_DB_URL); const db = await getDatabaseConnection('availablePincodes'); console.log('Executing DB query...'); const result = await db.execute({
       sql: 'UPDATE available_pincodes SET is_serviceable = ?, updated_at = CURRENT_TIMESTAMP WHERE pincode = ?',
       args: [isServiceable ? 1 : 0, pincode]
     });
@@ -151,3 +142,6 @@ module.exports = {
   getAllLocations,
   updateAvailability
 };
+
+
+

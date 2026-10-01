@@ -12,3 +12,17 @@
 2026-10-02 02:49:50.112 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
 2026-10-02 03:07:20.190 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
 2026-10-02 03:18:36.384 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:35:40.960 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:35:56.727 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:36:09.095 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:39:29.798 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:39:55.269 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:39:58.939 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:40:03.240 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:45:25.166 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:46:46.415 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:47:31.281 [redveg-backend] error: Error fetching orders: SQLITE_UNKNOWN: SQLite error: no such table: customers
+2026-10-02 03:48:37.778 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 03:49:04.176 [redveg-backend] error: Error fetching orders: SQLITE_UNKNOWN: SQLite error: no such table: customers
+2026-10-02 03:49:22.387 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)
+2026-10-02 04:04:18.796 [redveg-backend] error: Error fetching campaigns: SQL_INPUT_ERROR: SQLite input error: no such column: created_at (at offset 48)

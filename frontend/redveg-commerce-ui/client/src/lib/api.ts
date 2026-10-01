@@ -11,11 +11,21 @@ export function apiUrl(path: string) {
  * Shared browser API client. Admin endpoints use the HTTP-only session cookie;
  * public endpoints also work with credentials included when CORS is configured.
  */
-export function apiFetch(path: string, init: RequestInit = {}) {
-  return fetch(apiUrl(path), {
+export async function apiFetch(path: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+  
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(apiUrl(path), {
     ...init,
+    headers,
     credentials: init.credentials ?? 'include',
   });
+
+  return response;
 }
 
 export function normalizeCategorySlug(value: unknown) {

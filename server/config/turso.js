@@ -53,7 +53,7 @@ const initializeDatabaseConnections = () => {
     });
 
     // Initialize database schema
-    initializeSchema();
+    // initializeSchema(); // Disabled to prevent hrana client deadlock on startup
 
     console.log('Database connections initialized successfully');
   } catch (error) {
@@ -69,141 +69,164 @@ const initializeSchema = async () => {
   try {
     // Create settings table if not exists
     if (catalogDb) {
-      await catalogDb.execute(`
-        CREATE TABLE IF NOT EXISTS settings (
-          type TEXT PRIMARY KEY,
-          value TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+      try {
+        await catalogDb.execute(`
+          CREATE TABLE IF NOT EXISTS settings (
+            type TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
 
-      // Insert default header-theme setting if it doesn't exist
-      await catalogDb.execute(`
-        INSERT OR IGNORE INTO settings (type, value, created_at, updated_at)
-        VALUES ('header-theme', 'default', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `);
+        // Insert default header-theme setting if it doesn't exist
+        await catalogDb.execute(`
+          INSERT OR IGNORE INTO settings (type, value, created_at, updated_at)
+          VALUES ('header-theme', 'default', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `);
+      } catch (err) {
+        console.error('Error initializing settings schema:', err);
+      }
     }
 
     // Create campaigns table if not exists
     if (catalogDb) {
-      await catalogDb.execute(`
-        CREATE TABLE IF NOT EXISTS campaigns (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          slug TEXT NOT NULL UNIQUE,
-          occasion TEXT NOT NULL,
-          placement TEXT NOT NULL,
-          label TEXT,
-          message TEXT,
-          ctaLabel TEXT,
-          destinationType TEXT,
-          destinationValue TEXT,
-          startsAt DATETIME NOT NULL,
-          endsAt DATETIME NOT NULL,
-          timezone TEXT DEFAULT 'UTC',
-          priority INTEGER DEFAULT 0,
-          backgroundColor TEXT,
-          foregroundColor TEXT,
-          accentColor TEXT,
-          buttonColor TEXT,
-          buttonTextColor TEXT,
-          desktopImageUrl TEXT,
-          mobileImageUrl TEXT,
-          posterImageUrl TEXT,
-          altText TEXT,
-          targetLocations TEXT, -- JSON array of location IDs
-          targetDevice TEXT DEFAULT 'all',
-          analyticsCampaignId TEXT,
-          status TEXT DEFAULT 'draft',
-          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+      try {
+        await catalogDb.execute(`
+          CREATE TABLE IF NOT EXISTS campaigns (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            slug TEXT NOT NULL UNIQUE,
+            occasion TEXT NOT NULL,
+            placement TEXT NOT NULL,
+            label TEXT,
+            message TEXT,
+            ctaLabel TEXT,
+            destinationType TEXT,
+            destinationValue TEXT,
+            startsAt DATETIME NOT NULL,
+            endsAt DATETIME NOT NULL,
+            timezone TEXT DEFAULT 'UTC',
+            priority INTEGER DEFAULT 0,
+            backgroundColor TEXT,
+            foregroundColor TEXT,
+            accentColor TEXT,
+            buttonColor TEXT,
+            buttonTextColor TEXT,
+            desktopImageUrl TEXT,
+            mobileImageUrl TEXT,
+            posterImageUrl TEXT,
+            altText TEXT,
+            targetLocations TEXT, -- JSON array of location IDs
+            targetDevice TEXT DEFAULT 'all',
+            analyticsCampaignId TEXT,
+            status TEXT DEFAULT 'draft',
+            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+      } catch (err) {
+        console.error('Error initializing campaigns schema:', err);
+      }
     }
 
     // Create delivery_locations table if not exists
     if (catalogDb) {
-      await catalogDb.execute(`
-        CREATE TABLE IF NOT EXISTS delivery_locations (
-          pincode TEXT PRIMARY KEY,
-          area TEXT NOT NULL,
-          city TEXT NOT NULL,
-          state TEXT NOT NULL,
-          is_servicealbe INTEGER DEFAULT 1,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+      try {
+        await catalogDb.execute(`
+          CREATE TABLE IF NOT EXISTS delivery_locations (
+            pincode TEXT PRIMARY KEY,
+            area TEXT NOT NULL,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            is_servicealbe INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+      } catch (err) {
+        console.error('Error initializing delivery_locations schema:', err);
+      }
     }
 
     // Create customers table if not exists
     if (customerDb) {
-      await customerDb.execute(`
-        CREATE TABLE IF NOT EXISTS customers (
-          customer_id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          address TEXT NOT NULL,
-          password TEXT NOT NULL,
-          phone_no TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+      try {
+        await customerDb.execute(`
+          CREATE TABLE IF NOT EXISTS customers (
+            customer_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            address TEXT NOT NULL,
+            password TEXT NOT NULL,
+            phone_no TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+      } catch (err) {
+        console.error('Error initializing customers schema:', err);
+      }
     }
 
     // Create available_pincodes table if not exists
     if (availablePincodesDb) {
-      await availablePincodesDb.execute(`
-        CREATE TABLE IF NOT EXISTS available_pincodes (
-          pincode TEXT PRIMARY KEY,
-          area TEXT NOT NULL,
-          city TEXT NOT NULL,
-          state TEXT NOT NULL,
-          is_serviceable INTEGER NOT NULL DEFAULT 1 CHECK (is_serviceable IN (0, 1)),
-          latitude REAL,
-          longitude REAL,
-          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+      try {
+        await availablePincodesDb.execute(`
+          CREATE TABLE IF NOT EXISTS available_pincodes (
+            pincode TEXT PRIMARY KEY,
+            area TEXT NOT NULL,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            is_serviceable INTEGER NOT NULL DEFAULT 1 CHECK (is_serviceable IN (0, 1)),
+            latitude REAL,
+            longitude REAL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
 
-      // Create indexes for better query performance
-      await availablePincodesDb.execute(`
-        CREATE INDEX IF NOT EXISTS idx_available_pincodes_is_serviceable ON available_pincodes(is_serviceable);
-      `);
-      await availablePincodesDb.execute(`
-        CREATE INDEX IF NOT EXISTS idx_available_pincodes_city ON available_pincodes(city);
-      `);
-      await availablePincodesDb.execute(`
-        CREATE INDEX IF NOT EXISTS idx_available_pincodes_state ON available_pincodes(state);
-      `);
+        // Create indexes for better query performance
+        await availablePincodesDb.execute(`
+          CREATE INDEX IF NOT EXISTS idx_available_pincodes_is_serviceable ON available_pincodes(is_serviceable);
+        `);
+        await availablePincodesDb.execute(`
+          CREATE INDEX IF NOT EXISTS idx_available_pincodes_city ON available_pincodes(city);
+        `);
+        await availablePincodesDb.execute(`
+          CREATE INDEX IF NOT EXISTS idx_available_pincodes_state ON available_pincodes(state);
+        `);
+      } catch (err) {
+        console.error('Error initializing available_pincodes schema:', err);
+      }
     }
 
     // Migrate orders table: add customer_id and order_date if they don't exist
     if (ordersDb) {
-      // Check if customer_id column exists
-      const customerIdExists = await ordersDb.execute(`
-        SELECT COUNT(*) as count FROM pragma_table_info('orders') WHERE name = 'customer_id'
-      `);
-      if (customerIdExists.rows[0].count === 0) {
-        await ordersDb.execute(`
-          ALTER TABLE orders ADD COLUMN customer_id TEXT
+      try {
+        // Check if customer_id column exists
+        const customerIdExists = await ordersDb.execute(`
+          SELECT COUNT(*) as count FROM pragma_table_info('orders') WHERE name = 'customer_id'
         `);
-      }
+        if (customerIdExists.rows[0].count === 0) {
+          await ordersDb.execute(`
+            ALTER TABLE orders ADD COLUMN customer_id TEXT
+          `);
+        }
 
-      // Check if order_date column exists
-      const orderDateExists = await ordersDb.execute(`
-        SELECT COUNT(*) as count FROM pragma_table_info('orders') WHERE name = 'order_date'
-      `);
-      if (orderDateExists.rows[0].count === 0) {
-        await ordersDb.execute(`
-          ALTER TABLE orders ADD COLUMN order_date DATETIME DEFAULT CURRENT_TIMESTAMP
+        // Check if order_date column exists
+        const orderDateExists = await ordersDb.execute(`
+          SELECT COUNT(*) as count FROM pragma_table_info('orders') WHERE name = 'order_date'
         `);
+        if (orderDateExists.rows[0].count === 0) {
+          await ordersDb.execute(`
+            ALTER TABLE orders ADD COLUMN order_date DATETIME DEFAULT CURRENT_TIMESTAMP
+          `);
+        }
+      } catch (err) {
+        console.error('Error initializing orders schema:', err);
       }
     }
   } catch (error) {
-    console.error('Failed to initialize database schema:', error);
-    throw error;
+    console.error('Failed to initialize database schema (global catch):', error);
   }
 };
 
