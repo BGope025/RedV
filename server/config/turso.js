@@ -11,6 +11,56 @@ const {
 } = require('./env');
 const path = require('path');
 
+const TURSO_RETRY_ATTEMPTS = Math.max(1, Number(process.env.TURSO_RETRY_ATTEMPTS || 3));
+const TURSO_REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.TURSO_REQUEST_TIMEOUT_MS || 15000));
+
+async function fetchWithRetry(input, init = {}) {
+  let url = input;
+  let fetchInit = { ...init };
+
+  if (typeof input === 'object' && input.url) {
+    url = input.url;
+    fetchInit.method = input.method || fetchInit.method;
+    if (input.headers && typeof input.headers.forEach === 'function') {
+      const headers = {};
+      input.headers.forEach((value, key) => { headers[key] = value; });
+      fetchInit.headers = headers;
+    }
+    if (input.body !== undefined && input.body !== null) {
+      // If the body is a stream (node-fetch), we might need to handle it.
+      // But hrana client body is just stringified JSON.
+      fetchInit.body = typeof input.body === 'string' ? input.body : input.body.toString();
+    }
+  }
+
+  let lastError;
+  for (let attempt = 1; attempt <= TURSO_RETRY_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TURSO_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { ...fetchInit, signal: controller.signal });
+      clearTimeout(timeout);
+      return response;
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+      if (attempt < TURSO_RETRY_ATTEMPTS) await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+    }
+  }
+  throw lastError;
+}
+
+function createTursoClient(url, authToken, label) {
+  const clientConfig = { url, ...(authToken && { authToken }) };
+  if (/^https?:\/\//i.test(url)) clientConfig.fetch = fetchWithRetry;
+  try {
+    console.log(`[turso] ${label}: ${new URL(url).host}`);
+  } catch {
+    console.log(`[turso] ${label}: configured`);
+  }
+  return createClient(clientConfig);
+}
+
 // Database clients
 let catalogDb = null;
 let ordersDb = null;
@@ -26,31 +76,19 @@ const initializeDatabaseConnections = () => {
 
     // Catalog database connection
     const finalCatalogUrl = catalogDbUrl || `file:${path.join(dataPath, 'catalog.db')}`;
-    catalogDb = createClient({
-      url: finalCatalogUrl,
-      ...(catalogDbAuthToken && { authToken: catalogDbAuthToken })
-    });
+    catalogDb = createTursoClient(finalCatalogUrl, catalogDbAuthToken, 'catalog');
 
     // Orders database connection
     const finalOrdersUrl = ordersDbUrl || `file:${path.join(dataPath, 'orders.db')}`;
-    ordersDb = createClient({
-      url: finalOrdersUrl,
-      ...(ordersDbAuthToken && { authToken: ordersDbAuthToken })
-    });
+    ordersDb = createTursoClient(finalOrdersUrl, ordersDbAuthToken, 'orders');
 
     // Customers database connection
     const finalCustomerUrl = customerDbUrl || `file:${path.join(dataPath, 'customer.db')}`;
-    customerDb = createClient({
-      url: finalCustomerUrl,
-      ...(customerDbAuthToken && { authToken: customerDbAuthToken })
-    });
+    customerDb = createTursoClient(finalCustomerUrl, customerDbAuthToken, 'customer');
 
     // Available Pincodes database connection
     const finalAvailablePincodesUrl = availablePincodesDbUrl || `file:${path.join(dataPath, 'available-pincodes.db')}`;
-    availablePincodesDb = createClient({
-      url: finalAvailablePincodesUrl,
-      ...(availablePincodesDbAuthToken && { authToken: availablePincodesDbAuthToken })
-    });
+    availablePincodesDb = createTursoClient(finalAvailablePincodesUrl, availablePincodesDbAuthToken, 'available-pincodes');
 
     // Initialize database schema
     // initializeSchema(); // Disabled to prevent hrana client deadlock on startup

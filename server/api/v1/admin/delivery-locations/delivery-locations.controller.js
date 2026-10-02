@@ -6,9 +6,6 @@ const logger = require('../../../../utils/logger');
  * Get all delivery locations (including unavailable) for admin
  * @route GET /api/v1/admin/delivery-locations
  */
-const { createClient } = require('@libsql/client');
-require('dotenv').config();
-
 const getAllLocations = async (req, res) => {
   try {
     const { limit, offset } = req.query;
@@ -26,10 +23,7 @@ const getAllLocations = async (req, res) => {
       args.push(parseInt(offset));
     }
 
-    const db = createClient({
-      url: process.env.AVAILABLE_PINCODES_DB_URL,
-      authToken: process.env.AVAILABLE_PINCODES_DB_AUTH_TOKEN
-    });
+    const db = await getDatabaseConnection('availablePincodes');
     const result = args.length > 0 ? await db.execute({ sql, args }) : await db.execute(sql);
 
     const locations = result.rows.map(location => ({
@@ -85,7 +79,8 @@ const updateAvailability = async (req, res) => {
       throw generateValidationError('isServiceable must be a boolean');
     }
 
-    console.log('URL IS:', process.env.AVAILABLE_PINCODES_DB_URL); const db = await getDatabaseConnection('availablePincodes'); console.log('Executing DB query...'); const result = await db.execute({
+    const db = await getDatabaseConnection('availablePincodes');
+    const result = await db.execute({
       sql: 'UPDATE available_pincodes SET is_serviceable = ?, updated_at = CURRENT_TIMESTAMP WHERE pincode = ?',
       args: [isServiceable ? 1 : 0, pincode]
     });

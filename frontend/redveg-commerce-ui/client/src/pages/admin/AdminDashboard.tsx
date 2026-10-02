@@ -19,24 +19,27 @@ export default function AdminDashboard() {
 
         // Fetch products
         const productsResponse = await apiFetch('products');
-        if (!productsResponse.ok) throw new Error(`Failed to fetch products: ${productsResponse.status}`);
-        let productsData = await productsResponse.json();
-        productsData = productsData.data || productsData;
-        setProducts(Array.isArray(productsData) ? productsData : []);
+        if (productsResponse.ok) {
+          let productsData = await productsResponse.json();
+          productsData = productsData.data || productsData;
+          setProducts(Array.isArray(productsData) ? productsData : []);
+        }
 
         // Fetch orders (limit to recent ones if backend supports it, otherwise fetch all and slice)
         const ordersResponse = await apiFetch('orders');
-        if (!ordersResponse.ok) throw new Error(`Failed to fetch orders: ${ordersResponse.status}`);
-        let ordersData = await ordersResponse.json();
-        ordersData = ordersData.data || ordersData;
-        setOrders(Array.isArray(ordersData) ? ordersData : []);
+        if (ordersResponse.ok) {
+          let ordersData = await ordersResponse.json();
+          ordersData = ordersData.data || ordersData;
+          setOrders(Array.isArray(ordersData) ? ordersData.map(normalizeDashboardOrder) : []);
+        }
 
         // Fetch stats
         const statsResponse = await apiFetch('stats');
-        if (!statsResponse.ok) throw new Error(`Failed to fetch stats: ${statsResponse.status}`);
-        let statsData = await statsResponse.json();
-        statsData = statsData.data || statsData;
-        setStats(Array.isArray(statsData) ? statsData : []);
+        if (statsResponse.ok) {
+          let statsData = await statsResponse.json();
+          statsData = statsData.data || statsData;
+          setStats(Array.isArray(statsData) ? statsData : []);
+        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
         // In a real app, you might want to show an error message to the user
@@ -179,6 +182,20 @@ export default function AdminDashboard() {
       </section>
     </AdminShell>
   );
+}
+
+function normalizeDashboardOrder(raw: any) {
+  const items = Array.isArray(raw.cart_snapshot) ? raw.cart_snapshot : [];
+  const normalizedStatus = String(raw.status || "pending").toLowerCase();
+  return {
+    ...raw,
+    customer: raw.customer_name || raw.customer || "Customer",
+    itemCount: raw.itemCount ?? items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0),
+    pincode: raw.pincode || "",
+    placedAt: raw.placedAt || raw.created_at || raw.order_date || "",
+    total: Number(raw.total ?? raw.total_amount ?? 0),
+    status: normalizedStatus === "approved" || normalizedStatus === "completed" ? "Confirmed" : normalizedStatus === "cancelled" ? "Cancelled" : "New",
+  };
 }
 
 function QuickAction({ icon: Icon, title, text, href }: { icon: typeof PackagePlus; title: string; text: string; href: string }) {

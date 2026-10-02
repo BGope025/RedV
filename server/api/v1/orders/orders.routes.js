@@ -8,11 +8,12 @@ const {
   approveOrder,
   getUserOrders,
   getAllOrders,
+  cancelOrder,
   deleteOrder
 } = require('./orders.controller');
 
-// Public routes (for checkout) - now protected by customer auth
-router.post('/checkout', authenticateCustomer, createOrder);
+// Public guest checkout; the controller validates the supplied delivery details.
+router.post('/checkout', createOrder);
 
 // Protected routes
 router.use(protect);
@@ -22,6 +23,7 @@ router.use(authorize('admin'));
 router.get('/', getAllOrders); // Get all orders with filtering/pagination
 router.delete('/:id', deleteOrder); // Archive/delete order
 router.patch('/:id/approve', approveOrder);
+router.patch('/:id/cancel', cancelOrder);
 
 // User routes
 router.get('/customer/orders', authenticateCustomer, getUserOrders);

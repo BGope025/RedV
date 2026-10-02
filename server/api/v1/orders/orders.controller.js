@@ -14,14 +14,7 @@ const getAllOrders = async (req, res) => {
     const db = await getDatabaseConnection('orders');
 
     // Build query with filtering
-    let sql = `
-      SELECT o.*,
-             COALESCE(c.name, u.username) as customer_name
-      FROM orders o
-      LEFT JOIN customers c ON o.customer_id = c.customer_id
-      LEFT JOIN users u ON o.user_id = u.id
-      WHERE o.is_archived = 0
-    `;
+    let sql = `SELECT o.* FROM orders o WHERE o.is_archived = 0`;
     const args = [];
 
     // Filter by status
@@ -179,10 +172,8 @@ const getOrderById = async (req, res) => {
 const createOrder = async (req, res) => {
   let orderId = null;
   try {
-    // Get customer ID from authenticated customer
-    const { customerId } = req.customer;
-
-    const { cartItems } = req.body;
+    const { cartItems, customer } = req.body;
+    const customerId = req.customer?.customerId || customer?.customerId || `guest-${Date.now()}`;
 
     // Validate required fields
     if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
@@ -200,17 +191,13 @@ const createOrder = async (req, res) => {
     const ordersDb = await getDatabaseConnection('orders');
     const customerDb = await getDatabaseConnection('customer');
 
-    // Get customer details from customer database
-    const customerResult = await customerDb.execute({
-      sql: 'SELECT name, address, phoneNo FROM customers WHERE customer_id = ?',
-      args: [customerId]
-    });
-
-    if (customerResult.rows.length === 0) {
-      throw generateNotFoundError('Customer not found');
+    let customerDetails = customer;
+    if (req.customer) {
+      const customerResult = await customerDb.execute({ sql: 'SELECT name, address, phone_no AS phoneNo FROM customers WHERE customer_id = ?', args: [customerId] });
+      if (customerResult.rows.length === 0) throw generateNotFoundError('Customer not found');
+      customerDetails = customerResult.rows[0];
     }
-
-    const customer = customerResult.rows[0];
+    if (!customerDetails?.name || !customerDetails?.phoneNo || !customerDetails?.address) throw generateValidationError('Customer name, phone number, and address are required');
 
     // Generate order ID
     orderId = generateOrderId();
@@ -224,23 +211,37 @@ const createOrder = async (req, res) => {
       totalAmount += item.price * item.quantity;
     }
 
+    // Reserve inventory in one catalog transaction so concurrent checkouts cannot oversell.
+    await catalogDb.execute('BEGIN IMMEDIATE TRANSACTION');
+    try {
+      for (const item of cartItems) {
+        const result = await catalogDb.execute({ sql: 'UPDATE variants SET stock_count = stock_count - ? WHERE id = ? AND product_id = ? AND stock_count >= ?', args: [item.quantity, item.variantId, item.productId, item.quantity] });
+        if (!result.rowsAffected) throw generateOutOfStockError(`Insufficient stock for ${item.variantId}`);
+        await catalogDb.execute({ sql: 'UPDATE products SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND (SELECT COALESCE(SUM(stock_count), 0) FROM variants WHERE product_id = ?) = 0', args: [item.productId, item.productId] });
+      }
+      await catalogDb.execute('COMMIT');
+    } catch (error) {
+      await catalogDb.execute('ROLLBACK');
+      throw error;
+    }
+
     // Create pending order in ordersDb
     await ordersDb.execute({
       sql: `
         INSERT INTO orders (
-          id, customer_id, cart_snapshot, total_amount, customer_name,
+          id, user_id, customer_id, cart_snapshot, total_amount, customer_name,
           customer_phone, customer_address, status, is_archived, order_date
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, CURRENT_TIMESTAMP)
       `,
       args: [
         orderId,
         customerId,
+        customerId,
         JSON.stringify(cartSnapshot),
         totalAmount,
-        customer.name,
-        customer.phoneNo,
-        customer.address,
-        'pending'
+        customerDetails.name,
+        customerDetails.phoneNo,
+        customerDetails.address
       ]
     });
 
@@ -249,7 +250,7 @@ const createOrder = async (req, res) => {
     // Generate WhatsApp message for customer
     const whatsappMessage = generateWhatsAppMessage({
       orderId,
-      customerName: customer.name,
+      customerName: customerDetails.name,
       cartItems: cartSnapshot,
       totalAmount
     });
@@ -311,13 +312,17 @@ const approveOrder = async (req, res) => {
 
     logger.info(`Admin ${adminId} attempting to approve order ${id}`);
 
-    // Execute the cross-DB saga
-    const result = await executeCrossDbSaga(id, adminId);
+    const ordersDb = await getDatabaseConnection('orders');
+    const result = await ordersDb.execute({
+      sql: "UPDATE orders SET status = 'approved', approved_by = ?, approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_archived = 0 AND LOWER(status) IN ('pending', 'new')",
+      args: [adminId, id]
+    });
+    if (!result.rowsAffected) throw generateValidationError('Order is not pending or has already been processed');
 
     res.status(200).json({
       success: true,
       message: 'Order approved successfully',
-      data: result
+      data: { orderId: id, status: 'approved', approvedBy: adminId }
     });
   } catch (error) {
     logger.error('Error approving order:', error);
@@ -392,6 +397,20 @@ const getUserOrders = async (req, res) => {
  * Archive/delete order (Admin only)
  * @route DELETE /api/v1/orders/:id
  */
+const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDatabaseConnection('orders');
+    const result = await db.execute({ sql: "UPDATE orders SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_archived = 0 AND LOWER(status) IN ('pending', 'new')", args: [id] });
+    if (!result.rowsAffected) throw generateNotFoundError('Pending order not found');
+    res.status(200).json({ success: true, data: { id, status: 'cancelled' } });
+  } catch (error) {
+    if (error.type === 'not-found') return res.status(404).json({ success: false, message: error.message });
+    logger.error('Error cancelling order:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 const deleteOrder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -441,6 +460,7 @@ module.exports = {
   approveOrder,
   getUserOrders,
   getAllOrders,
+  cancelOrder,
   deleteOrder
 };
 

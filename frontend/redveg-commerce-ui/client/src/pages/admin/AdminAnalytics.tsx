@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
+import { apiFetch } from '@/lib/api';
 import { RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
 import {
   LineChart,
@@ -29,7 +30,7 @@ const AdminAnalytics = () => {
       const params = new URLSearchParams();
       if (range) params.append('range', range);
       if (bucket) params.append('bucket', bucket);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/stats/revenue?${params.toString()}`, {
+      const response = await apiFetch(`stats/revenue?${params.toString()}`, {
         credentials: 'include',
         headers: {
           Accept: 'application/json',

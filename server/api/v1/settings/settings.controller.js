@@ -82,8 +82,8 @@ const upsertSetting = async (req, res) => {
       throw generateValidationError('Settings value is required');
     }
 
-    // Only allow certain types to be updated via this endpoint
-    const allowedTypes = ['header-theme'];
+    // Only allow known settings to be updated via this endpoint
+    const allowedTypes = ['header-theme', 'store-status'];
     if (!allowedTypes.includes(type)) {
       throw generateValidationError(`Settings type "${type}" is not updatable via this endpoint`);
     }
@@ -151,8 +151,8 @@ const deleteSetting = async (req, res) => {
       throw generateValidationError('Settings type is required');
     }
 
-    // Only allow certain types to be deleted via this endpoint
-    const allowedTypes = ['header-theme'];
+    // Only allow known settings to be deleted via this endpoint
+    const allowedTypes = ['header-theme', 'store-status'];
     if (!allowedTypes.includes(type)) {
       throw generateValidationError(`Settings type "${type}" is not deletable via this endpoint`);
     }

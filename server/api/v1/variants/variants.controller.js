@@ -48,6 +48,22 @@ const getVariantsByProductId = async (req, res) => {
   }
 };
 
+const getAllAdminVariants = async (req, res) => {
+  try {
+    const db = await getDatabaseConnection('catalog');
+    const result = await db.execute(`
+      SELECT TRIM(v.id) AS id, TRIM(v.product_id) AS product_id, v.sku, v.size, v.weight, v.price, v.stock_count, p.name AS product_name
+      FROM variants v
+      LEFT JOIN products p ON p.id = v.product_id
+      ORDER BY v.id ASC, v.sku ASC
+    `);
+    res.status(200).json({ success: true, count: result.rows.length, data: result.rows });
+  } catch (error) {
+    logger.error('Error fetching all admin variants:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 /**
  * Get variant by ID
  * @route GET /api/v1/variants/:id
@@ -331,6 +347,7 @@ const deleteVariant = async (req, res) => {
 };
 
 module.exports = {
+  getAllAdminVariants,
   getVariantsByProductId,
   getVariantById,
   createVariant,

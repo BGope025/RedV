@@ -3,8 +3,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Bell, ChevronRight, Gift, LayoutDashboard, LogOut, Menu, Package, Palette, Search, Settings, ShoppingBag, Tags, Truck, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { apiFetch } from "@/lib/api";
 
 const adminLinks = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -21,14 +22,16 @@ const adminLinks = [
 export function AdminShell({ children, title, subtitle, action }: { children: React.ReactNode; title: string; subtitle: string; action?: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [storeStatus, setStoreStatus] = useState<{ isOpen?: boolean; city?: string; closingTime?: string }>({});
+  useEffect(() => { apiFetch("settings/store-status").then((response) => response.ok ? response.json() : null).then((payload) => { if (!payload?.data) return; try { const parsed = typeof payload.data.value === "string" ? JSON.parse(payload.data.value) : payload.data.value; if (parsed && typeof parsed === "object") setStoreStatus(parsed); } catch { /* keep default */ } }).catch(() => undefined); }, []);
 
   const sidebar = (
     <aside className="flex h-full flex-col overflow-hidden bg-[#17110F] px-4 pb-5 pt-6 text-white">
       <div className="px-2"><BrandLogo inverse /></div>
       <div className="mx-2 mt-8 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
         <div className="flex items-center justify-between"><span className="text-[0.65rem] font-black uppercase tracking-[0.15em] text-white/45">Store status</span><span className="size-2 rounded-full bg-[#72B556] shadow-[0_0_0_4px_rgba(114,181,86,.12)]" /></div>
-        <p className="mt-2 text-sm font-bold">Open for orders</p>
-        <p className="mt-1 text-xs text-white/45">Kolkata · until 8:00 PM</p>
+        <p className="mt-2 text-sm font-bold">{storeStatus?.isOpen === false ? "Closed for orders" : "Open for orders"}</p>
+        <p className="mt-1 text-xs text-white/45">{storeStatus?.city || "Kolkata"} · until {storeStatus?.closingTime || "8:00 PM"}</p>
       </div>
       <nav className="mt-6 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-width:thin]" aria-label="Admin navigation">
         {adminLinks.map(({ href, label, icon: Icon, badge }) => {

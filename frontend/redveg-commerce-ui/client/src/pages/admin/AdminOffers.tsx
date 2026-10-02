@@ -68,7 +68,7 @@ export default function AdminOffers() {
         toast.success('Offer updated successfully');
         // Update the campaign in the list
         setCampaigns(prev =>
-          prev.map(c => (c.id === editingCampaign.id ? updatedCampaign : c))
+          prev.map(c => (c.id === editingCampaign.id && updatedCampaign ? updatedCampaign : c))
         );
         handleCloseEditor();
       }
@@ -144,8 +144,7 @@ export default function AdminOffers() {
               <p className="mt-1 text-sm text-muted-foreground">{campaign.message}</p>
               <div className="mt-5 flex items-end justify-between">
                 <div>
-                  <span className="text-xl font-black">₹{campaign.price?.toString() || '0'}</span>
-                  <span className="ml-2 text-sm text-muted-foreground line-through">₹{campaign.mrp?.toString() || '0'}</span>
+                  <span className="text-sm font-black text-muted-foreground">{campaign.placement.replace('_', ' ')}</span>
                 </div>
                 <Button onClick={() => handleEdit(campaign)} variant="outline" size="icon" className="rounded-full bg-white">
                   <Edit3 className="size-4" />
@@ -183,8 +182,8 @@ export default function AdminOffers() {
             <div className="mt-8">
               {/* Pass props to AdminCampaignForm */}
               <AdminCampaignForm
-                campaignId={editorMode === 'edit' ? editingCampaign?.id : undefined}
-                campaign={editorMode === 'edit' ? editingCampaign : undefined}
+                campaignId={editorMode === 'edit' && editingCampaign ? editingCampaign.id : undefined}
+                campaign={editorMode === 'edit' && editingCampaign ? editingCampaign : undefined}
                 // We need to handle the save and close callbacks from the form.
                 // However, AdminCampaignForm currently navigates back on its own.
                 // We need to modify it to accept onSave and onClose callbacks, or we can rely on its internal navigation and then refresh.

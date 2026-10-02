@@ -12,8 +12,8 @@ const {
 
 // Public routes
 router.get('/', getCampaigns); // Get campaigns with filtering
-router.get('/:id', getCampaignById); // Get specific campaign by ID
 router.get('/active', resolveActiveCampaign); // Get active campaign based on time/location/device
+router.get('/:id', getCampaignById); // Get specific campaign by ID
 
 // Protected routes (require authentication)
 router.use(protect);

@@ -41,7 +41,7 @@ const getCampaigns = async (req, res) => {
       sql += ' WHERE ' + conditions.join(' AND ');
     }
 
-    sql += ' ORDER BY priority DESC, created_at DESC';
+    sql += ' ORDER BY priority DESC, createdAt DESC';
 
     // Add pagination
     if (limit !== undefined) {
@@ -60,10 +60,10 @@ const getCampaigns = async (req, res) => {
     // Format dates for frontend compatibility
     const campaigns = result.rows.map(campaign => ({
       ...campaign,
-      startsAt: campaign.startsAt || new Date().toISOString(),
-      endsAt: campaign.endsAt || new Date(Date.now() + 30*24*60*60*1000).toISOString(),
-      createdAt: campaign.createdAt || new Date().toISOString(),
-      updatedAt: campaign.updatedAt || new Date().toISOString()
+      startsAt: campaign.startsAt || campaign.starts_at || new Date().toISOString(),
+      endsAt: campaign.endsAt || campaign.ends_at || new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+      createdAt: campaign.createdAt || campaign.created_at || new Date().toISOString(),
+      updatedAt: campaign.updatedAt || campaign.updated_at || new Date().toISOString()
     }));
 
     res.status(200).json({
@@ -312,7 +312,7 @@ const updateCampaign = async (req, res) => {
     }
 
     // Always update the updatedAt timestamp
-    updates.push('updated_at = ?');
+    updates.push('updatedAt = ?');
     args.push(new Date().toISOString());
 
     if (updates.length === 0) {
@@ -396,7 +396,7 @@ const deleteCampaign = async (req, res) => {
 
     // Soft delete by setting status to archived
     await db.execute({
-      sql: 'UPDATE campaigns SET status = "archived", updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      sql: 'UPDATE campaigns SET status = "archived", updatedAt = CURRENT_TIMESTAMP WHERE id = ?',
       args: [id]
     });
 

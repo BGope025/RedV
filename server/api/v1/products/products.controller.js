@@ -14,6 +14,18 @@ function slugify(text) {
 }
 
 function mapProduct(row, variants = []) {
+  const mappedVariants = variants.map((variant) => ({
+    id: variant.id,
+    sku: variant.sku,
+    label: [variant.size, variant.weight].filter(Boolean).join(' / ') || variant.sku,
+    size: variant.size || null,
+    weight: variant.weight || null,
+    price: Number(variant.price),
+    stock: Number(variant.stock_count || 0),
+    stockCount: Number(variant.stock_count || 0),
+    available: Number(variant.stock_count || 0) > 0
+  }));
+  const totalStock = mappedVariants.reduce((sum, variant) => sum + variant.stock, 0);
   return {
     id: row.id,
     name: row.name,
@@ -23,19 +35,9 @@ function mapProduct(row, variants = []) {
     category: row.category,
     image: row.image_url || null,
     imageUrl: row.image_url || null,
-    isActive: Boolean(row.is_active),
+    isActive: Boolean(row.is_active) && totalStock > 0,
     rating: row.rating == null ? null : Number(row.rating),
-    variants: variants.map((variant) => ({
-      id: variant.id,
-      sku: variant.sku,
-      label: variant.size || variant.weight || variant.sku,
-      size: variant.size || null,
-      weight: variant.weight || null,
-      price: Number(variant.price),
-      stock: Number(variant.stock_count || 0),
-      stockCount: Number(variant.stock_count || 0),
-      available: Number(variant.stock_count || 0) > 0
-    }))
+    variants: mappedVariants
   };
 }
 
@@ -73,7 +75,7 @@ const getAllProducts = async (req, res) => {
     }
 
     let sql = `
-      SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count
+      SELECT p.*, v.id as variant_id, v.product_id as variant_product_id, v.sku, v.size, v.weight, v.price, v.stock_count
       FROM (
         SELECT p.*
         FROM products p
@@ -81,7 +83,7 @@ const getAllProducts = async (req, res) => {
         ORDER BY ${sortClause}
         ${limit ? 'LIMIT ? OFFSET ?' : ''}
       ) p
-      LEFT JOIN variants v ON p.id = v.product_id
+      LEFT JOIN variants v ON p.id = v.product_id OR p.id = v.id
       ORDER BY ${sortClause}
     `;
 
@@ -102,9 +104,9 @@ const getAllProducts = async (req, res) => {
         variantsMap.set(productId, []);
       }
 
-      if (row.variant_id) {
+      if (row.variant_id !== null && row.variant_id !== undefined || row.sku) {
         variantsMap.get(productId).push({
-          id: row.variant_id,
+          id: row.variant_id || `${productId}-${row.sku}-${variantsMap.get(productId).length}`,
           sku: row.sku,
           size: row.size,
           weight: row.weight,
@@ -131,51 +133,44 @@ const getAllProducts = async (req, res) => {
 const getAdminProducts = async (req, res) => {
   try {
     const db = await getDatabaseConnection('catalog');
-
-    // Add pagination and searching parameters
     const search = req.query.q ? req.query.q.trim() : '';
     const limit = parseInt(req.query.limit, 10) || null;
     const offset = parseInt(req.query.offset, 10) || 0;
-
+    const productArgs = [];
     let filterClause = '';
-    const args = [];
+
     if (search) {
-      filterClause = " WHERE p.name LIKE ? OR p.description LIKE ?";
-      args.push(`%${search}%`, `%${search}%`);
+      filterClause = ' WHERE p.name LIKE ? OR p.description LIKE ?';
+      productArgs.push(`%${search}%`, `%${search}%`);
     }
 
-    let sql = `
-      SELECT p.*, v.id as variant_id, v.sku, v.size, v.weight, v.price, v.stock_count
-      FROM (
-        SELECT p.*
-        FROM products p
-        ${filterClause}
-        ORDER BY p.created_at DESC
-        ${limit ? 'LIMIT ? OFFSET ?' : ''}
-      ) p
-      LEFT JOIN variants v ON p.id = v.product_id
-      ORDER BY p.created_at DESC
-    `;
-
+    let productSql = `SELECT p.* FROM products p${filterClause} ORDER BY p.created_at DESC`;
     if (limit) {
-      args.push(limit, offset);
+      productSql += ' LIMIT ? OFFSET ?';
+      productArgs.push(limit, offset);
     }
 
-    const result = await db.execute({ sql, args });
+    const productResult = await db.execute({ sql: productSql, args: productArgs });
+    const productRows = productResult.rows || [];
+    const productIds = productRows.map((row) => row.id).filter(Boolean);
+    const variantsMap = new Map(productIds.map((id) => [id, []]));
 
-    const productsMap = new Map();
-    const variantsMap = new Map();
+    if (productIds.length > 0) {
+      const placeholders = productIds.map(() => '?').join(', ');
+      const variantResult = await db.execute({
+        sql: `SELECT id, product_id, sku, size, weight, price, stock_count
+              FROM variants
+              WHERE TRIM(product_id) IN (${placeholders}) OR TRIM(id) IN (${placeholders})`,
+        args: [...productIds, ...productIds]
+      });
 
-    result.rows.forEach(row => {
-      const productId = row.id;
-      if (!productsMap.has(productId)) {
-        productsMap.set(productId, row);
-        variantsMap.set(productId, []);
-      }
-
-      if (row.variant_id) {
+      for (const row of variantResult.rows || []) {
+        const variantProductId = String(row.product_id || '').trim();
+        const variantId = String(row.id || '').trim();
+        const productId = productIds.includes(variantProductId) ? variantProductId : (productIds.includes(variantId) ? variantId : null);
+        if (!productId) continue;
         variantsMap.get(productId).push({
-          id: row.variant_id,
+          id: row.id || `${productId}-${row.sku}-${variantsMap.get(productId).length}`,
           sku: row.sku,
           size: row.size,
           weight: row.weight,
@@ -183,12 +178,9 @@ const getAdminProducts = async (req, res) => {
           stock_count: row.stock_count
         });
       }
-    });
+    }
 
-    const products = Array.from(productsMap.values()).map(row => 
-      mapProduct(row, variantsMap.get(row.id))
-    );
-
+    const products = productRows.map((row) => mapProduct(row, variantsMap.get(row.id) || []));
     res.status(200).json({ success: true, count: products.length, data: products });
   } catch (error) {
     logger.error('Error fetching admin products:', error);
@@ -330,13 +322,20 @@ const updateVariant = async (req, res) => {
     if (size !== undefined) { updates.push('size = ?'); args.push(size); }
     if (weight !== undefined) { updates.push('weight = ?'); args.push(weight); }
     if (price !== undefined) { updates.push('price = ?'); args.push(price); }
-    if (stock_count !== undefined) { updates.push('stock_count = ?'); args.push(stock_count); }
+    if (stock_count !== undefined) { updates.push('stock_count = ?'); args.push(Math.max(0, Number(stock_count))); }
     updates.push('updated_at = CURRENT_TIMESTAMP');
 
     if (updates.length === 1) return res.status(400).json({ success: false, message: 'No fields' });
 
     args.push(id);
     await db.execute({ sql: `UPDATE variants SET ${updates.join(', ')} WHERE id = ?`, args });
+    if (stock_count !== undefined) {
+      const variantResult = await db.execute({ sql: 'SELECT product_id FROM variants WHERE id = ?', args: [id] });
+      if (variantResult.rows.length) {
+        const productId = variantResult.rows[0].product_id;
+        await db.execute({ sql: `UPDATE products SET is_active = CASE WHEN (SELECT COALESCE(SUM(stock_count), 0) FROM variants WHERE product_id = ?) > 0 THEN is_active ELSE 0 END, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, args: [productId, productId] });
+      }
+    }
 
     res.status(200).json({ success: true, message: 'Variant updated' });
   } catch (error) {
@@ -368,3 +367,5 @@ module.exports = {
   updateVariant,
   deleteVariant
 };
+
+

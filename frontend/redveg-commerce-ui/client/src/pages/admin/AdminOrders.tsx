@@ -25,8 +25,9 @@ export default function AdminOrders() {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const data = await response.json();
-        setOrders(data);
+        const payload = await response.json();
+        const rows = payload.data || payload;
+        setOrders(Array.isArray(rows) ? rows.map(normalizeOrder) : []);
       } catch (error) {
         console.error("Error fetching orders:", error);
         toast.error("Failed to load orders");
@@ -46,11 +47,23 @@ export default function AdminOrders() {
     [filter, orders, search]
   );
 
-  const updateStatus = (id: string, status: OrderStatus) => {
-    setOrders((current) => current.map((order) => order.id === id ? { ...order, status } : order));
-    setSelected((current) => current?.id === id ? { ...current, status } : current);
-    toast.success(`Order ${id} moved to ${status}`);
+  const updateStatus = async (id: string, status: OrderStatus) => {
+    const endpoint = status === "Cancelled" ? `orders/${id}/cancel` : `orders/${id}/approve`;
+    try {
+      const response = await apiFetch(endpoint, { method: "PATCH" });
+      if (!response.ok) throw new Error((await response.json()).message || "Unable to update order");
+      setOrders((current) => current.map((order) => order.id === id ? { ...order, status } : order));
+      setSelected((current) => current?.id === id ? { ...current, status } : current);
+      toast.success(`Order ${id} moved to ${status}`);
+    } catch (error: any) {
+      toast.error("Order update failed", { description: error.message });
+    }
   };
+
+  function normalizeOrder(raw: any): Order {
+    const items = Array.isArray(raw.cart_snapshot) ? raw.cart_snapshot : [];
+    return { id: raw.id, customer: raw.customer_name || raw.customer || "Customer", mobile: raw.customer_phone || raw.mobile || "", address: raw.customer_address || raw.address || "", pincode: raw.pincode || "", placedAt: raw.created_at || raw.order_date || "", total: Number(raw.total_amount ?? raw.total ?? 0), itemCount: items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0), source: "WhatsApp", status: String(raw.status || "pending").toLowerCase() === "cancelled" ? "Cancelled" : String(raw.status || "pending").toLowerCase() === "approved" ? "Confirmed" : "New", items: items.map((item: any) => ({ name: item.name || item.productName || item.product_id, variant: item.variant || item.label || item.variantId, quantity: Number(item.quantity || 0), unitPrice: Number(item.price || item.unitPrice || 0) })) };
+  }
 
   return (
     <AdminShell title="Orders" subtitle="Review customer details and move orders through fulfilment."

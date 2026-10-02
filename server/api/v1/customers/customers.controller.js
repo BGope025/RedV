@@ -255,10 +255,25 @@ const getCustomerProfile = async (req, res) => {
   }
 };
 
+const getAllCustomers = async (req, res) => {
+  try {
+    const db = await getDatabaseConnection('customer');
+    const result = await db.execute({
+      sql: 'SELECT customer_id, name, address, phone_no AS phoneNo, created_at FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      args: [Math.min(Number(req.query.limit) || 100, 500), Number(req.query.offset) || 0]
+    });
+    res.status(200).json({ success: true, count: result.rows.length, data: result.rows });
+  } catch (error) {
+    logger.error('Error fetching customers:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 module.exports = {
   registerCustomer,
   loginCustomer,
   getCustomerProfile,
+  getAllCustomers,
   generateCustomerId
 };
 

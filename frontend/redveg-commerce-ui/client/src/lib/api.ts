@@ -1,3 +1,5 @@
+import { isAdminCacheFallbackEnabled, isAdminMockMode, mockApiFetch } from './adminMockApi';
+
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
 export function apiUrl(path: string) {
@@ -12,6 +14,9 @@ export function apiUrl(path: string) {
  * public endpoints also work with credentials included when CORS is configured.
  */
 export async function apiFetch(path: string, init: RequestInit = {}) {
+  const method = String(init.method ?? 'GET').toUpperCase();
+  if (isAdminMockMode()) return mockApiFetch(path, method);
+
   const headers = new Headers(init.headers);
   const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
   
@@ -19,13 +24,24 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(apiUrl(path), {
-    ...init,
-    headers,
-    credentials: init.credentials ?? 'include',
-  });
-
-  return response;
+  try {
+    const response = await fetch(apiUrl(path), {
+      ...init,
+      headers,
+      credentials: init.credentials ?? 'include',
+    });
+    if (response.ok && method === 'GET' && isAdminCacheFallbackEnabled()) {
+      const cacheKey = `redveg-api-cache:${path}`;
+      response.clone().text().then((body) => localStorage.setItem(cacheKey, body)).catch(() => undefined);
+    }
+    return response;
+  } catch (error) {
+    if (method === 'GET' && isAdminCacheFallbackEnabled()) {
+      const cached = localStorage.getItem(`redveg-api-cache:${path}`);
+      if (cached) return new Response(cached, { status: 200, headers: { 'Content-Type': 'application/json', 'X-RedVeg-Data-Mode': 'cache' } });
+    }
+    throw error;
+  }
 }
 
 export function normalizeCategorySlug(value: unknown) {

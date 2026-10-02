@@ -33,7 +33,7 @@ export default function AdminCatalog() {
     image_url: "",
     is_active: true
   });
-  const [variantsData, setVariantsData] = useState([{ id: 'temp-'+Date.now(), sku: 'SKU-'+Date.now(), label: "500 g", price: 0, stock: 0 }]);
+  const [variantsData, setVariantsData] = useState([{ id: 'temp-'+Date.now(), sku: 'SKU-'+Date.now(), label: "500 g", size: "", weight: "500 g", price: 0, stock: 0 }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Debounce search
@@ -70,12 +70,18 @@ export default function AdminCatalog() {
         searchParams.set("limit", PAGE_SIZE.toString());
         searchParams.set("offset", "0");
 
-        const response = await apiFetch(`admin/products?${searchParams.toString()}`);
+        const [response, variantsResponse] = await Promise.all([
+          apiFetch(`admin/products?${searchParams.toString()}`),
+          apiFetch('admin/variants')
+        ]);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
+
         const data = await response.json();
         const items = data.data || data;
-        const newProducts = Array.isArray(items) ? items : [];
+        const variantsPayload = variantsResponse.ok ? await variantsResponse.json() : [];
+        const bulkVariants = extractVariantRows(variantsPayload);
+        const productVariants = await loadVariantsPerProduct(Array.isArray(items) ? items : []);
+        const newProducts = mergeProductVariants(Array.isArray(items) ? items : [], [...bulkVariants, ...productVariants]);
 
         if (!cancelled) {
           setProducts(newProducts);
@@ -171,7 +177,9 @@ export default function AdminCatalog() {
         product.variants?.map((v: any) => ({
           id: v.id,
           sku: v.sku || 'SKU-'+Date.now(),
-          label: v.label || v.size,
+          label: v.label || [v.size, v.weight].filter(Boolean).join(' / '),
+          size: v.size || '',
+          weight: v.weight || '',
           price: v.price,
           stock: v.stock
         })) || []
@@ -186,7 +194,7 @@ export default function AdminCatalog() {
         image_url: "",
         is_active: true
       });
-      setVariantsData([{ id: 'temp-'+Date.now(), sku: 'SKU-'+Date.now(), label: "500 g", price: 0, stock: 0 }]);
+      setVariantsData([{ id: 'temp-'+Date.now(), sku: 'SKU-'+Date.now(), label: "500 g", size: "", weight: "500 g", price: 0, stock: 0 }]);
     }
     setShowEditor(true);
   };
@@ -228,7 +236,8 @@ export default function AdminCatalog() {
       for (const variant of variantsData) {
         const variantPayload = {
           sku: variant.sku,
-          size: variant.label,
+          size: variant.size || variant.label,
+          weight: variant.weight || null,
           price: Number(variant.price),
           stock_count: Number(variant.stock)
         };
@@ -335,7 +344,7 @@ export default function AdminCatalog() {
                     <img src={product.image || 'https://placehold.co/150'} alt="" className="size-14 rounded-xl object-cover" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-black">{product.name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{product.variants?.map((v: any) => v.label).join(", ")}</p>
+                      <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">{product.variants?.map((v: any) => <p key={v.id}>{v.label} · ₹{Number(v.price || 0)} · {Number(v.stock ?? v.stockCount ?? 0)} in stock</p>)}</div>
                       <div className="mt-3 flex flex-wrap items-center gap-3">
                         <span className={`text-sm font-black ${stock <= 9 ? "text-[#B4232C]" : "text-[#267345]"}`}>{stock} in stock</span>
                       </div>
@@ -384,7 +393,7 @@ export default function AdminCatalog() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm font-bold capitalize">{product.category}</td>
-                      <td className="px-4 py-4 text-sm font-bold">{product.variants?.map((v: any) => v.label).join(", ")}</td>
+                      <td className="px-4 py-4 text-xs font-bold"><div className="space-y-1">{product.variants?.map((v: any) => <p key={v.id}><span>{v.label}</span><span className="ml-2 text-muted-foreground">₹{Number(v.price || 0)} · {Number(v.stock ?? v.stockCount ?? 0)} stock</span></p>)}</div></td>
                       <td className="px-4 py-4 text-sm font-black">₹{minPrice}</td>
                       <td className="px-4 py-4"><span className={`text-sm font-black ${stock <= 9 ? "text-[#B4232C]" : "text-[#267345]"}`}>{stock}</span></td>
                       <td className="px-4 py-4">
@@ -479,8 +488,8 @@ export default function AdminCatalog() {
                     <h3 className="font-black">Variants & pricing</h3>
                     <p className="mt-1 text-xs text-muted-foreground">Each pack size has its own price and stock.</p>
                   </div>
-                  <Button 
-                    onClick={() => setVariantsData([...variantsData, { id: 'temp-'+Date.now(), sku: 'SKU-'+Date.now(), label: "New Size", price: 0, stock: 0 }])} 
+                    <Button 
+                    onClick={() => setVariantsData([...variantsData, { id: 'temp-'+Date.now(), sku: 'SKU-'+Date.now(), label: "New Size", size: "New Size", weight: "", price: 0, stock: 0 }])} 
                     variant="outline" 
                     className="rounded-full bg-white text-xs font-black"
                   >
@@ -556,6 +565,60 @@ export default function AdminCatalog() {
       )}
     </AdminShell>
   );
+}
+
+function extractVariantRows(payload: any) {
+  return Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.variants)
+        ? payload.variants
+        : Array.isArray(payload?.data?.variants)
+          ? payload.data.variants
+          : [];
+}
+
+async function loadVariantsPerProduct(products: any[]) {
+  const rows: any[] = [];
+  await Promise.all(products.map(async (product) => {
+    if (!product?.id) return;
+    try {
+      const response = await apiFetch(`variants/products/${encodeURIComponent(product.id)}/variants`);
+      if (!response.ok) return;
+      rows.push(...extractVariantRows(await response.json()));
+    } catch {
+      // The bulk admin endpoint remains the primary source; this is only a compatibility fallback.
+    }
+  }));
+  return rows;
+}
+
+function mergeProductVariants(products: any[], rawVariants: any[]) {
+  const variantsByProduct = new Map<string, any[]>();
+  for (const row of Array.isArray(rawVariants) ? rawVariants : []) {
+    const productId = String(row.product_id || row.productId || row.parent_product_id || '').trim();
+    if (!productId) continue;
+    const variant = {
+      id: row.id || `${productId}-${row.sku || 'variant'}-${variantsByProduct.get(productId)?.length || 0}`,
+      sku: row.sku || '',
+      label: [row.size, row.weight].filter(Boolean).join(' / ') || row.sku || 'Variant',
+      size: row.size || null,
+      weight: row.weight || null,
+      price: Number(row.price ?? 0),
+      stock: Number(row.stock_count ?? row.stockCount ?? row.stock ?? 0),
+      stockCount: Number(row.stock_count ?? row.stockCount ?? row.stock ?? 0),
+      available: Number(row.stock_count ?? row.stockCount ?? row.stock ?? 0) > 0,
+    };
+    const existing = variantsByProduct.get(productId) || [];
+    if (!existing.some((item) => (item.id && item.id === variant.id) || (item.sku && item.sku === variant.sku))) {
+      variantsByProduct.set(productId, [...existing, variant]);
+    }
+  }
+  return products.map((product) => ({
+    ...product,
+    variants: variantsByProduct.get(String(product.id).trim())?.length ? variantsByProduct.get(String(product.id).trim()) : (product.variants || []),
+  }));
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

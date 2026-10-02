@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { MapPinned, Loader2, RefreshCw } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { apiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 interface DeliveryLocation {
   pincode: string;
@@ -47,11 +47,7 @@ export default function AdminDeliveryAreas() {
     setLoading(true);
     setError(null);
     try {
-      const apiUrlStr = apiUrl('admin/delivery-locations');
-      const response = await fetch(apiUrlStr, {
-        method: 'GET',
-        credentials: 'include'
-      });
+      const response = await apiFetch('admin/delivery-locations');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -72,8 +68,7 @@ export default function AdminDeliveryAreas() {
     const pincode = location.pincode;
     setUpdating(prev => new Set(prev).add(pincode));
     try {
-      const apiUrlStr = apiUrl(`admin/delivery-locations/${pincode}/availability`);
-      const response = await fetch(apiUrlStr, {
+      const response = await apiFetch(`admin/delivery-locations/${pincode}/availability`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'

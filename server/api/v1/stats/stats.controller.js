@@ -1,4 +1,4 @@
-const { getDatabaseConnection } = require('../../../config/turso');
+﻿const { getDatabaseConnection } = require('../../../config/turso');
 const { generateNotFoundError, generateValidationError } = require('../../../utils/error-classes');
 const logger = require('../../../utils/logger');
 
@@ -38,8 +38,8 @@ const getStats = async (req, res) => {
           COALESCE(SUM(total_amount), 0) as revenue
         FROM orders
         WHERE status IN ('approved', 'completed')
-          AND order_date >= ?
-          AND order_date < ?
+          AND created_at >= ?
+          AND created_at < ?
       `,
       args: [startToday, endToday],
     });
@@ -52,8 +52,8 @@ const getStats = async (req, res) => {
           COALESCE(SUM(total_amount), 0) as revenue
         FROM orders
         WHERE status IN ('approved', 'completed')
-          AND order_date >= ?
-          AND order_date < ?
+          AND created_at >= ?
+          AND created_at < ?
       `,
       args: [startYesterday, endYesterday],
     });
@@ -207,14 +207,14 @@ const getRevenueStats = async (req, res) => {
         `;
     // Depending on bucket, we need to group by period
     if (bucket === 'day') {
-      sql += `strftime('%Y-%m-%d', datetime(order_date, '+5 hours', '+30 minutes')) as period,`;
+      sql += `strftime('%Y-%m-%d', datetime(created_at, '+5 hours', '+30 minutes')) as period,`;
     } else if (bucket === 'week') {
-      sql += `strftime('%Y-%W', datetime(order_date, '+5 hours', '+30 minutes')) as period,`;
+      sql += `strftime('%Y-%W', datetime(created_at, '+5 hours', '+30 minutes')) as period,`;
     } else if (bucket === 'month') {
-      sql += `strftime('%Y-%m', datetime(order_date, '+5 hours', '+30 minutes')) as period,`;
+      sql += `strftime('%Y-%m', datetime(created_at, '+5 hours', '+30 minutes')) as period,`;
     } else {
       // default to month if bucket not specified
-      sql += `strftime('%Y-%m', datetime(order_date, '+5 hours', '+30 minutes')) as period,`;
+      sql += `strftime('%Y-%m', datetime(created_at, '+5 hours', '+30 minutes')) as period,`;
     }
     sql += `
       COUNT(*) as order_count,
@@ -226,10 +226,10 @@ const getRevenueStats = async (req, res) => {
 
     // Add date filters
     if (startUTC) {
-      sql += ` AND order_date >= ${startUTC}`;
+      sql += ` AND created_at >= ${startUTC}`;
     }
     if (endUTC) {
-      sql += ` AND order_date < ${endUTC}`;
+      sql += ` AND created_at < ${endUTC}`;
     }
 
     // Add grouping

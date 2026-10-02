@@ -8,6 +8,7 @@ import { ArrowLeft, Check, Copy, ExternalLink, MapPin, MessageCircle, ShieldChec
 import { useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { apiFetch } from "@/lib/api";
 
 export default function CheckoutPage() {
   const { resolvedItems, subtotal, deliveryFee, total, clearCart } = useCart();
@@ -17,7 +18,7 @@ export default function CheckoutPage() {
 
   const update = (field: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((current) => ({ ...current, [field]: event.target.value }));
 
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!resolvedItems.length) return toast.error("Your basket is empty.");
     if (!form.name.trim() || !/^\d{10}$/.test(form.mobile.replace(/\D/g, "")) || !form.address.trim() || !form.locality.trim() || !/^\d{6}$/.test(form.pincode)) {
@@ -25,15 +26,17 @@ export default function CheckoutPage() {
       return;
     }
     setSubmitting(true);
-    const savedTotal = total;
-    const savedLines = resolvedItems.map((item) => `${item.product.name} – ${item.variant.label} × ${item.quantity} – ₹${item.lineTotal}`);
-    window.setTimeout(() => {
-      const id = `RV-${String(Math.floor(1000 + Math.random() * 8999))}`;
-      const message = [`REDVEG ORDER ${id}`, `Customer: ${form.name}`, `Phone: ${form.mobile}`, `Address: ${form.address}, ${form.locality} - ${form.pincode}`, "", ...savedLines, "", `Total: ₹${savedTotal}`].join("\n");
-      setSavedOrder({ id, total: savedTotal, message });
-      setSubmitting(false);
+    try {
+      const response = await apiFetch("orders/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cartItems: resolvedItems.map((item) => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity })), customer: { name: form.name.trim(), phoneNo: form.mobile.replace(/\D/g, ""), address: `${form.address}, ${form.locality}${form.landmark ? `, ${form.landmark}` : ""} - ${form.pincode}` } }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Unable to save your order");
+      setSavedOrder({ id: payload.data.orderId, total: Number(payload.data.totalAmount), message: payload.data.whatsappMessage });
       clearCart();
-    }, 900);
+    } catch (error: any) {
+      toast.error("Order could not be saved", { description: error.message });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openWhatsapp = () => savedOrder && window.open(`https://wa.me/918910558446?text=${encodeURIComponent(savedOrder.message)}`, "_blank", "noopener,noreferrer");
