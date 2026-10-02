@@ -1,6 +1,38 @@
+# Node.js
 node_modules/
-.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
 dist/
-build/
-.next/
+.build/
+.tmp/
+.cache/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
 *.log
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+.coverage
+.nyc_output
